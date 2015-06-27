@@ -1,0 +1,3 @@
+[submodule "cnn"]
+	path = cnn
+	url = git@github.com:clab/cnn.git

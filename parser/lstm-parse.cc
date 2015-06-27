@@ -39,8 +39,6 @@ unsigned POS_DIM = 10;
 unsigned REL_DIM = 8;
 
 
-bool USE_SPELLING = false;
-
 bool USE_POS = false;
 
 constexpr const char* ROOT_SYMBOL = "ROOT";
@@ -77,7 +75,6 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
         ("lstm_input_dim", po::value<unsigned>()->default_value(60), "LSTM input dimension")
         ("train,t", "Should training be run?")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
-        ("use_spelling,S", "Use spelling model") //Miguel. Spelling model
         ("help,h", "Help");
   po::options_description dcmdline_options;
   dcmdline_options.add(opts);
@@ -497,9 +494,6 @@ int main(int argc, char** argv) {
   InitCommandLine(argc, argv, &conf);
   USE_POS = conf.count("use_pos_tags");
 
-  USE_SPELLING=conf.count("use_spelling"); //Miguel
-  corpus.USE_SPELLING=USE_SPELLING;
-
   LAYERS = conf["layers"].as<unsigned>();
   INPUT_DIM = conf["input_dim"].as<unsigned>();
   PRETRAINED_DIM = conf["pretrained_dim"].as<unsigned>();
@@ -580,7 +574,6 @@ int main(int argc, char** argv) {
 
   // OOV words will be replaced by UNK tokens
   corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
-  if (USE_SPELLING) VOCAB_SIZE = corpus.nwords + 1;
   //TRAINING
   if (conf.count("train")) {
     signal(SIGINT, signal_callback_handler);
@@ -654,10 +647,8 @@ int main(int argc, char** argv) {
 	   const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
 	   const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
            vector<unsigned> tsentence=sentence;
-	   if (!USE_SPELLING) {
-                for (auto& w : tsentence)
-                    if (training_vocab.count(w) == 0) w = kUNK;
-           }
+           for (auto& w : tsentence)
+             if (training_vocab.count(w) == 0) w = kUNK;
 
            ComputationGraph hg;
 	   vector<unsigned> pred = parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,vector<unsigned>(),corpus.actions,corpus.intToWords,&right);
@@ -706,10 +697,8 @@ int main(int argc, char** argv) {
       const vector<string>& sentenceUnkStr=corpus.sentencesStrDev[sii]; 
       const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
       vector<unsigned> tsentence=sentence;
-      if (!USE_SPELLING) {
-        for (auto& w : tsentence)
-	  if (training_vocab.count(w) == 0) w = kUNK;
-      }
+      for (auto& w : tsentence)
+        if (training_vocab.count(w) == 0) w = kUNK;
       ComputationGraph cg;
       double lp = 0;
       vector<unsigned> pred;

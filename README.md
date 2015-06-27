@@ -4,6 +4,7 @@ Transition based dependency parser with state embeddings computed by LSTM RNNs
 #### Required software
 
  * A C++ compiler supporting the [C++11 language standard](https://en.wikipedia.org/wiki/C%2B%2B11)
+ * [Boost](http://www.boost.org/) libraries
  * [Eigen](http://eigen.tuxfamily.org) (newer versions strongly recommended)
  * [CMake](http://www.cmake.org/)
 

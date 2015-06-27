@@ -601,7 +601,7 @@ int main(int argc, char** argv) {
     bool first = true;
     int iter = -1;
     time_t time_start = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    cerr << "TRAINING STARTED AT: " << std::ctime(&time_start) << endl;
+    cerr << "TRAINING STARTED AT: " << put_time(localtime(&time_start), "%c %Z") << endl;
     while(!requested_stop) {
       ++iter;
       for (unsigned sii = 0; sii < status_every_i_iterations; ++sii) {
@@ -635,7 +635,7 @@ int main(int argc, char** argv) {
       }
       sgd.status();
       time_t time_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-      cerr << "update #" << iter << " (epoch " << (tot_seen / corpus.nsentences) << " |time=" << std::ctime(&time_now) << ")\tllh: "<< llh<<" ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << endl;
+      cerr << "update #" << iter << " (epoch " << (tot_seen / corpus.nsentences) << " |time=" << put_time(localtime(&time_now), "%c %Z") << ")\tllh: "<< llh<<" ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << endl;
       llh = trs = right = 0;
 
       static int logc = 0;

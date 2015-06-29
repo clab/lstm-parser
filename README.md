@@ -30,6 +30,8 @@ To train a parsing model with the LSTM parser type the following at the command 
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c development.conll > devOracle.txt
 
     parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 -w sskip.100.vectors --pretrained_dim 100 --rel_dim 20 --action_dim 20 -t -P
+    
+This will run several iterations of the training process, you should stop it when the development result does not sufficiently improve.
 
 #### Parse data with your parsing model
 

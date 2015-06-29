@@ -23,16 +23,24 @@ The first time you clone the repository, you need to sync the `cnn/` submodule.
     make -j2
 
 #### Train a parsing model
+Having a training.conll file and a development.conll formatted according to the [CoNLL data format](http://ilk.uvt.nl/conll/#dataformat)
+To train a parsing model with the LSTM parser type the following at the command line prompt:
+
+    java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c training.conll > trainingOracle.txt
+    java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c development.conll > devOracle.txt
 
     parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 -w sskip.100.vectors --pretrained_dim 100 --rel_dim 20 --action_dim 20 -t -P
 
 #### Parse data with your parsing model
 
+Having a test.conll file formatted according to the [CoNLL data format](http://ilk.uvt.nl/conll/#dataformat)
+
+    java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c test.conll > testOracle.txt
+
     parser/lstm-parse -T trainingOracle.txt -d testOracle.txt --hidden_dim 100 --lstm_input_dim 100 -w sskip.100.vectors --pretrained_dim 100 --rel_dim 20 --action_dim 20 -P -m parser_pos_2_32_100_20_100_12_20-pidXXXX.params
 
-The model name is stored where the parser has been trained.
-
-TODO
+The model name/id is stored where the parser has been trained.
+The parser will output the conll file with the parsing result.
 
 #### Pretrained models
 

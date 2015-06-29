@@ -63,3 +63,7 @@ If you make use of this software, please cite the following:
 
 This software is released under the terms of the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
+#### Contact
+
+For questions and usage issues, please contact cdyer@cs.cmu.edu and miguel.ballesteros@upf.edu
+

@@ -23,15 +23,16 @@ The first time you clone the repository, you need to sync the `cnn/` submodule.
     make -j2
 
 #### Train a parsing model
-Having a training.conll file and a development.conll formatted according to the [CoNLL data format](http://ilk.uvt.nl/conll/#dataformat)
-To train a parsing model with the LSTM parser type the following at the command line prompt:
+
+Having a training.conll file and a development.conll formatted according to the [CoNLL data format](http://ilk.uvt.nl/conll/#dataformat), to train a parsing model with the LSTM parser type the following at the command line prompt:
 
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c training.conll > trainingOracle.txt
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c development.conll > devOracle.txt
 
     parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 -w sskip.100.vectors --pretrained_dim 100 --rel_dim 20 --action_dim 20 -t -P
     
-This will run several iterations of the training process, you should stop it when the development result does not substantially improve anymore.
+Link to the word vectors that we used in the ACL 2015 paper for English:  [sskip.100.vectors](https://drive.google.com/file/d/0B8nESzOdPhLsdWF2S1Ayb1RkTXc/view?usp=sharing).
+This will run several iterations of the training process, you should stop it when the development result does not substantially improve anymore. Normally, after 5500 iterations.
 
 #### Parse data with your parsing model
 

@@ -35,7 +35,7 @@ Link to the word vectors that we used in the ACL 2015 paper for English:  [sskip
 
 Note-1: you can also run it without word embeddings by removing the -w option for both training and parsing.
 
-Note-2: the training process should be stopped wheen the development result does not substantially improve anymore. Normally, after 5500 iterations.
+Note-2: the training process should be stopped when the development result does not substantially improve anymore. Normally, after 5500 iterations.
 
 #### Parse data with your parsing model
 

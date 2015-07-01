@@ -32,7 +32,8 @@ Having a training.conll file and a development.conll formatted according to the 
     parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 -w sskip.100.vectors --pretrained_dim 100 --rel_dim 20 --action_dim 20 -t -P
     
 Link to the word vectors that we used in the ACL 2015 paper for English:  [sskip.100.vectors](https://drive.google.com/file/d/0B8nESzOdPhLsdWF2S1Ayb1RkTXc/view?usp=sharing).
-This will run several iterations of the training process, you should stop it when the development result does not substantially improve anymore. Normally, after 5500 iterations.
+
+Note: the training process should be stopped wheen the development result does not substantially improve anymore. Normally, after 5500 iterations.
 
 #### Parse data with your parsing model
 

@@ -11,6 +11,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cnn)
 set(WITH_EIGEN_BACKEND 1)
 
 # look for Boost
+if(DEFINED ENV{BOOST_ROOT})
+  set(Boost_NO_SYSTEM_PATHS ON)
+endif()
 set(Boost_REALPATH ON)
 find_package(Boost COMPONENTS program_options serialization REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})

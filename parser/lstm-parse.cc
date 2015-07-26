@@ -951,7 +951,7 @@ int main(int argc, char** argv) {
 
   if (conf.count("words")) {
     pretrained[kUNK] = vector<float>(PRETRAINED_DIM, 0);
-    cerr << "Loading from " << conf["words"].as<string>() << " with" << PRETRAINED_DIM << " dimensions\n";
+    cerr << "Loading from " << conf["words"].as<string>() << " with " << PRETRAINED_DIM << " dimensions\n";
     ifstream in(conf["words"].as<string>().c_str());
     string line;
     getline(in, line);

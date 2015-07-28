@@ -76,6 +76,7 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
         ("rel_dim", po::value<unsigned>()->default_value(10), "relation dimension")
         ("lstm_input_dim", po::value<unsigned>()->default_value(60), "LSTM input dimension")
         ("train,t", "Should training be run?")
+        ("maxit,M", po::value<unsigned>()->default_value(8000), "Maximum number of training iterations")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
         ("use_spelling,S", "Use spelling model") //Miguel. Spelling model
         ("help,h", "Help");
@@ -943,6 +944,8 @@ int main(int argc, char** argv) {
   }
   const double unk_prob = conf["unk_prob"].as<double>();
   assert(unk_prob >= 0.); assert(unk_prob <= 1.);
+  const unsigned maxit = conf["maxit"].as<unsigned>();
+  cerr << "Maximum number of iterations: " << maxit << "\n";
   ostringstream os;
   os << "parser_" << (USE_POS ? "pos" : "nopos")
      << '_' << LAYERS
@@ -1031,9 +1034,8 @@ int main(int argc, char** argv) {
     double right = 0;
     double llh = 0;
     bool first = true;
-    int iter = -1;
-    while(!requested_stop) {
-      ++iter;
+    unsigned iter = 0;
+    while(!requested_stop && iter < maxit) {
       for (unsigned sii = 0; sii < status_every_i_iterations; ++sii) {
            if (si == corpus.nsentences) {
              si = 0;
@@ -1120,6 +1122,10 @@ int main(int argc, char** argv) {
           }
         }
       }
+      ++iter;
+    }
+    if (iter >= maxit) {
+      cerr << "\nMaximum number of iterations reached (" << iter << "), terminating optimization...\n";
     }
   } // should do training?
   if (true) { // do test evaluation

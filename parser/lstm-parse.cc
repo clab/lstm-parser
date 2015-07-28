@@ -15,8 +15,11 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/program_options.hpp>
 
 #include "cnn/training.h"
@@ -898,6 +901,22 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
   cout << endl;
 }
 
+void init_pretrained(istream &in) {
+  string line;
+  vector<float> v(PRETRAINED_DIM, 0);
+  string word;
+  while (getline(in, line)) {
+    if (word.empty() && line.find('.') == std::string::npos)
+      continue; // first line contains vocabulary size and dimensions
+    istringstream lin(line);
+    lin >> word;
+    for (unsigned i = 0; i < PRETRAINED_DIM; ++i) lin >> v[i];
+    unsigned id = corpus.get_or_add_word(word);
+    pretrained[id] = v;
+  }
+}
+
+
 int main(int argc, char** argv) {
   cnn::Initialize(argc, argv);
 
@@ -945,24 +964,24 @@ int main(int argc, char** argv) {
   const string fname = os.str();
   cerr << "Writing parameters to file: " << fname << endl;
   bool softlinkCreated = false;
-  corpus.load_correct_actions(conf["training_data"].as<string>());	
+  corpus.load_correct_actions(conf["training_data"].as<string>());
   const unsigned kUNK = corpus.get_or_add_word(cpyp::Corpus::UNK);
   kROOT_SYMBOL = corpus.get_or_add_word(ROOT_SYMBOL);
 
   if (conf.count("words")) {
     pretrained[kUNK] = vector<float>(PRETRAINED_DIM, 0);
-    cerr << "Loading from " << conf["words"].as<string>() << " with " << PRETRAINED_DIM << " dimensions\n";
-    ifstream in(conf["words"].as<string>().c_str());
-    string line;
-    getline(in, line);
-    vector<float> v(PRETRAINED_DIM, 0);
-    string word;
-    while (getline(in, line)) {
-      istringstream lin(line);
-      lin >> word;
-      for (unsigned i = 0; i < PRETRAINED_DIM; ++i) lin >> v[i];
-      unsigned id = corpus.get_or_add_word(word);
-      pretrained[id] = v;
+    const string& words_fname = conf["words"].as<string>();
+    cerr << "Loading from " << words_fname << " with " << PRETRAINED_DIM << " dimensions\n";
+    if (boost::algorithm::ends_with(words_fname, ".gz")) {
+      ifstream file(words_fname.c_str(), ios_base::in | ios_base::binary);
+      boost::iostreams::filtering_streambuf<boost::iostreams::input> zip;
+      zip.push(boost::iostreams::zlib_decompressor());
+      zip.push(file);
+      istream in(&zip);
+      init_pretrained(in);
+    } else {
+      ifstream in(words_fname.c_str());
+      init_pretrained(in); // read as normal text
     }
   }
 
@@ -1036,7 +1055,7 @@ int main(int argc, char** argv) {
              for (auto& w : tsentence)
                if (singletons.count(w) && cnn::rand01() < unk_prob) w = kUNK;
            }
-	   const vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]]; 
+	   const vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]];
 	   const vector<unsigned>& actions=corpus.correct_act_sent[order[si]];
            ComputationGraph hg;
            parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,actions,corpus.actions,corpus.intToWords,&right);
@@ -1068,7 +1087,7 @@ int main(int argc, char** argv) {
         auto t_start = std::chrono::high_resolution_clock::now();
         for (unsigned sii = 0; sii < dev_size; ++sii) {
            const vector<unsigned>& sentence=corpus.sentencesDev[sii];
-	   const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
+	   const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii];
 	   const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
            vector<unsigned> tsentence=sentence;
 	   if (!USE_SPELLING) {

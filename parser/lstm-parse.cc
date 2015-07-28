@@ -2,16 +2,11 @@
 #include <algorithm>
 #include <sstream>
 #include <iostream>
-#include <vector>
-#include <limits>
-#include <cmath>
 #include <chrono>
-#include <ctime>
 
 #include <unordered_map>
 #include <unordered_set>
 
-#include <execinfo.h>
 #include <unistd.h>
 #include <signal.h>
 
@@ -25,9 +20,7 @@
 #include "cnn/training.h"
 #include "cnn/cnn.h"
 #include "cnn/expr.h"
-#include "cnn/nodes.h"
 #include "cnn/lstm.h"
-#include "cnn/rnn.h"
 #include "c2.h"
 
 cpyp::Corpus corpus;

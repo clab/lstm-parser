@@ -37,6 +37,8 @@ Note-1: you can also run it without word embeddings by removing the -w option fo
 
 Note-2: the training process should be stopped when the development result does not substantially improve anymore. Normally, after 5500 iterations.
 
+Note-3: the parser reports (after each iteration) results including punctuation symbols while in the ACL-15 paper we report results excluding them (as it is common practice in those data sets). You can find eval.pl script from the CoNLL-X Shared Task to get the correct numbers.
+
 #### Parse data with your parsing model
 
 Having a test.conll file formatted according to the [CoNLL data format](http://ilk.uvt.nl/conll/#dataformat)

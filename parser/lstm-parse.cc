@@ -77,7 +77,7 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
         ("lstm_input_dim", po::value<unsigned>()->default_value(60), "LSTM input dimension")
         ("train,t", "Should training be run?")
         ("maxit,M", po::value<unsigned>()->default_value(8000), "Maximum number of training iterations")
-        ("tolerance", po::value<double>()->default_value(0.0), "Tolerance on dev uas for stopping training")
+        ("tolerance", po::value<double>()->default_value(-1.0), "Tolerance on dev uas for stopping training")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
         ("use_spelling,S", "Use spelling model") //Miguel. Spelling model
         ("help,h", "Help");
@@ -967,7 +967,9 @@ int main(int argc, char** argv) {
   const unsigned maxit = conf["maxit"].as<unsigned>();
   cerr << "Maximum number of iterations: " << maxit << "\n";
   const double tolerance = conf["tolerance"].as<double>();
-  cerr << "Optimization tolerance: " << tolerance << "\n";
+  if (tolerance > 0.0) {
+    cerr << "Optimization tolerance: " << tolerance << "\n";
+  }
   ostringstream os;
   os << "parser_" << (USE_POS ? "pos" : "nopos")
      << '_' << LAYERS
@@ -1060,7 +1062,7 @@ int main(int argc, char** argv) {
     double uas = -1;
     double prev_uas = -1;
     while(!requested_stop && iter < maxit &&
-        (uas < 0 || prev_uas < 0 || abs(prev_uas - uas) > tolerance)) {
+        (tolerance < 0 || uas < 0 || prev_uas < 0 || abs(prev_uas - uas) > tolerance)) {
       for (unsigned sii = 0; sii < status_every_i_iterations; ++sii) {
            if (si == corpus.nsentences) {
              si = 0;

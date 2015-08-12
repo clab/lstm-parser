@@ -1,6 +1,8 @@
 # lstm-parser
 Transition based dependency parser with state embeddings computed by LSTM RNNs
 
+For the [EMNLP character-based model](http://arxiv.org/pdf/1508.00657.pdf), please check out from the branch "char-based" and follow the instructions shown in the readme file of the new branch.
+
 #### Required software
 
  * A C++ compiler supporting the [C++11 language standard](https://en.wikipedia.org/wiki/C%2B%2B11)

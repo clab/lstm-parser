@@ -29,7 +29,7 @@ Having a training.conll file and a development.conll formatted according to the 
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c training.conll > trainingOracle.txt
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c development.conll > devOracle.txt
 
-    parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 --pretrained_dim 100 --rel_dim 20 --action_dim 20 -t -P -S
+    parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 --pretrained_dim 100 --rel_dim 20 --action_dim 20 --input_dim 100 -t -P -S
 
 Note-1: these model can be either run with or without pretrained word embeddings, although all the experiments reported in the EMNLP paper are run without.
 

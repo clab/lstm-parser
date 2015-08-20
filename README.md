@@ -29,7 +29,7 @@ Having a training.conll file and a development.conll formatted according to the 
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c training.conll > trainingOracle.txt
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c development.conll > devOracle.txt
 
-    parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 --pretrained_dim 100 --rel_dim 20 --action_dim 20 -t -P -S
+    parser/lstm-parse -T trainingOracle.txt -d devOracle.txt --hidden_dim 100 --input_dim 100 --lstm_input_dim 100 --pretrained_dim 100 --rel_dim 20 --action_dim 20 -t -P -S
 
 Note-1: these model can be either run with or without pretrained word embeddings, although all the experiments reported in the EMNLP paper are run without.
 
@@ -43,7 +43,7 @@ Having a test.conll file formatted according to the [CoNLL data format](http://i
 
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c test.conll > testOracle.txt
     
-    parser/lstm-parse -T trainingOracle.txt -d testOracle.txt --hidden_dim 100 --lstm_input_dim 100 --pretrained_dim 100 --rel_dim 20 --action_dim 20 --input_dim 100 -P -S -m parser_pos_2_100_100_20_100_12_20-pidXXXXX.params
+    parser/lstm-parse -T trainingOracle.txt -d testOracle.txt --hidden_dim 100 --input_dim 100 --lstm_input_dim 100 --pretrained_dim 100 --rel_dim 20 --action_dim 20 --input_dim 100 -P -S -m parser_pos_2_100_100_20_100_12_20-pidXXXXX.params
 
 The model name/id is stored where the parser has been trained.
 The parser will output the conll file with the parsing result.

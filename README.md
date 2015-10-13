@@ -58,7 +58,7 @@ If you make use of this software, please cite the following:
 
     @inproceedings{ballesteros:2015emnlp,
       author={Miguel Ballesteros and Chris Dyer and Noah A. Smith},
-      title={Improved Transition-Based Parsingby Modeling Characters instead of Words with LSTMs}
+      title={Improved Transition-Based Parsing by Modeling Characters instead of Words with LSTMs}
       booktitle={Proc. EMNLP},
       year=2015,
     }

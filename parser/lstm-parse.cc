@@ -121,34 +121,33 @@ struct ParserBuilder {
       stack_lstm(LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, model),
       buffer_lstm(LAYERS, LSTM_INPUT_DIM, HIDDEN_DIM, model),
       action_lstm(LAYERS, ACTION_DIM, HIDDEN_DIM, model),
-      p_w(model->add_lookup_parameters(VOCAB_SIZE, Dim(INPUT_DIM, 1))),
-      p_a(model->add_lookup_parameters(ACTION_SIZE, Dim(ACTION_DIM, 1))),
-      p_r(model->add_lookup_parameters(ACTION_SIZE, Dim(REL_DIM, 1))),
-      p_pbias(model->add_parameters(Dim(HIDDEN_DIM, 1))),
-      p_A(model->add_parameters(Dim(HIDDEN_DIM, HIDDEN_DIM))),
-      p_B(model->add_parameters(Dim(HIDDEN_DIM, HIDDEN_DIM))),
-      p_S(model->add_parameters(Dim(HIDDEN_DIM, HIDDEN_DIM))),
-      p_H(model->add_parameters(Dim(LSTM_INPUT_DIM, LSTM_INPUT_DIM))),
-      p_D(model->add_parameters(Dim(LSTM_INPUT_DIM, LSTM_INPUT_DIM))),
-      p_R(model->add_parameters(Dim(LSTM_INPUT_DIM, REL_DIM))),
-      p_w2l(model->add_parameters(Dim(LSTM_INPUT_DIM, INPUT_DIM))),
-      p_ib(model->add_parameters(Dim(LSTM_INPUT_DIM, 1))),
-      p_cbias(model->add_parameters(Dim(LSTM_INPUT_DIM, 1))),
-      p_p2a(model->add_parameters(Dim(ACTION_SIZE, HIDDEN_DIM))),
-      p_action_start(model->add_parameters(Dim(ACTION_DIM, 1))),
-      p_abias(model->add_parameters(Dim(ACTION_SIZE, 1))),
-
-      p_buffer_guard(model->add_parameters(Dim(LSTM_INPUT_DIM, 1))),
-      p_stack_guard(model->add_parameters(Dim(LSTM_INPUT_DIM, 1))) {
+      p_w(model->add_lookup_parameters(VOCAB_SIZE, {INPUT_DIM})),
+      p_a(model->add_lookup_parameters(ACTION_SIZE, {ACTION_DIM})),
+      p_r(model->add_lookup_parameters(ACTION_SIZE, {REL_DIM})),
+      p_pbias(model->add_parameters({HIDDEN_DIM})),
+      p_A(model->add_parameters({HIDDEN_DIM, HIDDEN_DIM})),
+      p_B(model->add_parameters({HIDDEN_DIM, HIDDEN_DIM})),
+      p_S(model->add_parameters({HIDDEN_DIM, HIDDEN_DIM})),
+      p_H(model->add_parameters({LSTM_INPUT_DIM, LSTM_INPUT_DIM})),
+      p_D(model->add_parameters({LSTM_INPUT_DIM, LSTM_INPUT_DIM})),
+      p_R(model->add_parameters({LSTM_INPUT_DIM, REL_DIM})),
+      p_w2l(model->add_parameters({LSTM_INPUT_DIM, INPUT_DIM})),
+      p_ib(model->add_parameters({LSTM_INPUT_DIM})),
+      p_cbias(model->add_parameters({LSTM_INPUT_DIM})),
+      p_p2a(model->add_parameters({ACTION_SIZE, HIDDEN_DIM})),
+      p_action_start(model->add_parameters({ACTION_DIM})),
+      p_abias(model->add_parameters({ACTION_SIZE})),
+      p_buffer_guard(model->add_parameters({LSTM_INPUT_DIM})),
+      p_stack_guard(model->add_parameters({LSTM_INPUT_DIM})) {
     if (USE_POS) {
-      p_p = model->add_lookup_parameters(POS_SIZE, Dim(POS_DIM, 1));
-      p_p2l = model->add_parameters(Dim(LSTM_INPUT_DIM, POS_DIM));
+      p_p = model->add_lookup_parameters(POS_SIZE, {POS_DIM});
+      p_p2l = model->add_parameters({LSTM_INPUT_DIM, POS_DIM});
     }
     if (pretrained.size() > 0) {
-      p_t = model->add_lookup_parameters(VOCAB_SIZE, Dim(PRETRAINED_DIM, 1));
+      p_t = model->add_lookup_parameters(VOCAB_SIZE, {PRETRAINED_DIM});
       for (auto it : pretrained)
         p_t->Initialize(it.first, it.second);
-      p_t2l = model->add_parameters(Dim(LSTM_INPUT_DIM, PRETRAINED_DIM));
+      p_t2l = model->add_parameters({LSTM_INPUT_DIM, PRETRAINED_DIM});
     } else {
       p_t = nullptr;
       p_t2l = nullptr;

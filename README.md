@@ -62,7 +62,7 @@ If you make use of this software, please cite the following:
 
     @inproceedings{dyer:2015acl,
       author={Chris Dyer and Miguel Ballesteros and Wang Ling and Austin Matthews and Noah A. Smith},
-      title={Transition-based Dependeny Parsing with Stack Long Short-Term Memory}
+      title={Transition-based Dependeny Parsing with Stack Long Short-Term Memory},
       booktitle={Proc. ACL},
       year=2015,
     }

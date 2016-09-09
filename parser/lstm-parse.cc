@@ -442,19 +442,19 @@ unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp, unsig
 }
 
 void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
-                  const vector<string>& sentenceUnkStrings, 
-                  const map<unsigned, string>& intToWords, 
-                  const map<unsigned, string>& intToPos, 
+                  const vector<string>& sentenceUnkStrings,
+                  const map<unsigned, string>& intToWords,
+                  const map<unsigned, string>& intToPos,
                   const map<int,int>& hyp, const map<int,string>& rel_hyp) {
   for (unsigned i = 0; i < (sentence.size()-1); ++i) {
     auto index = i + 1;
-    assert(i < sentenceUnkStrings.size() && 
+    assert(i < sentenceUnkStrings.size() &&
            ((sentence[i] == corpus.get_or_add_word(cpyp::Corpus::UNK) &&
              sentenceUnkStrings[i].size() > 0) ||
             (sentence[i] != corpus.get_or_add_word(cpyp::Corpus::UNK) &&
              sentenceUnkStrings[i].size() == 0 &&
              intToWords.find(sentence[i]) != intToWords.end())));
-    string wit = (sentenceUnkStrings[i].size() > 0)? 
+    string wit = (sentenceUnkStrings[i].size() > 0)?
       sentenceUnkStrings[i] : intToWords.find(sentence[i])->second;
     auto pit = intToPos.find(pos[i]);
     assert(hyp.find(i) != hyp.end());
@@ -466,10 +466,10 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
     size_t first_char_in_rel = hyp_rel.find('(') + 1;
     size_t last_char_in_rel = hyp_rel.rfind(')') - 1;
     hyp_rel = hyp_rel.substr(first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
-    cout << index << '\t'       // 1. ID 
+    cout << index << '\t'       // 1. ID
          << wit << '\t'         // 2. FORM
-         << "_" << '\t'         // 3. LEMMA 
-         << "_" << '\t'         // 4. CPOSTAG 
+         << "_" << '\t'         // 3. LEMMA
+         << "_" << '\t'         // 4. CPOSTAG
          << pit->second << '\t' // 5. POSTAG
          << "_" << '\t'         // 6. FEATS
          << hyp_head << '\t'    // 7. HEAD
@@ -484,7 +484,7 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 int main(int argc, char** argv) {
   cnn::Initialize(argc, argv);
 
-  cerr << "COMMAND:"; 
+  cerr << "COMMAND:";
   for (unsigned i = 0; i < static_cast<unsigned>(argc); ++i) cerr << ' ' << argv[i];
   cerr << endl;
   unsigned status_every_i_iterations = 100;
@@ -524,7 +524,7 @@ int main(int argc, char** argv) {
   const string fname = os.str();
   cerr << "Writing parameters to file: " << fname << endl;
   bool softlinkCreated = false;
-  corpus.load_correct_actions(conf["training_data"].as<string>());	
+  corpus.load_correct_actions(conf["training_data"].as<string>());
   const unsigned kUNK = corpus.get_or_add_word(cpyp::Corpus::UNK);
   kROOT_SYMBOL = corpus.get_or_add_word(ROOT_SYMBOL);
 
@@ -610,7 +610,7 @@ int main(int argc, char** argv) {
              for (auto& w : tsentence)
                if (singletons.count(w) && cnn::rand01() < unk_prob) w = kUNK;
            }
-	   const vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]]; 
+	   const vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]];
 	   const vector<unsigned>& actions=corpus.correct_act_sent[order[si]];
            ComputationGraph hg;
            parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,actions,corpus.actions,corpus.intToWords,&right);
@@ -643,7 +643,7 @@ int main(int argc, char** argv) {
         auto t_start = std::chrono::high_resolution_clock::now();
         for (unsigned sii = 0; sii < dev_size; ++sii) {
            const vector<unsigned>& sentence=corpus.sentencesDev[sii];
-	   const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
+	   const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii];
 	   const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
            vector<unsigned> tsentence=sentence;
            for (auto& w : tsentence)
@@ -671,9 +671,9 @@ int main(int argc, char** argv) {
           // easier to refer to it in a shell script.
           if (!softlinkCreated) {
             string softlink = " latest_model";
-            if (system((string("rm -f ") + softlink).c_str()) == 0 && 
+            if (system((string("rm -f ") + softlink).c_str()) == 0 &&
                 system((string("ln -s ") + fname + softlink).c_str()) == 0) {
-              cerr << "Created " << softlink << " as a soft link to " << fname 
+              cerr << "Created " << softlink << " as a soft link to " << fname
                    << " for convenience." << endl;
             }
             softlinkCreated = true;
@@ -692,8 +692,8 @@ int main(int argc, char** argv) {
     unsigned corpus_size = corpus.nsentencesDev;
     for (unsigned sii = 0; sii < corpus_size; ++sii) {
       const vector<unsigned>& sentence=corpus.sentencesDev[sii];
-      const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
-      const vector<string>& sentenceUnkStr=corpus.sentencesStrDev[sii]; 
+      const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii];
+      const vector<string>& sentenceUnkStr=corpus.sentencesStrDev[sii];
       const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
       vector<unsigned> tsentence=sentence;
       for (auto& w : tsentence)

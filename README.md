@@ -9,6 +9,7 @@ For the [EMNLP character-based model](http://arxiv.org/pdf/1508.00657.pdf), plea
  * [Boost](http://www.boost.org/) libraries
  * [Eigen](http://eigen.tuxfamily.org) (newer versions strongly recommended)
  * [CMake](http://www.cmake.org/)
+ * [gcc](https://gcc.gnu.org/gcc-5/) (only tested with gcc version 5.3.0, may be incompatible with earlier versions)
 
 #### Build instructions
 

@@ -10,13 +10,6 @@ For the [EMNLP character-based model](http://arxiv.org/pdf/1508.00657.pdf), plea
  * [Eigen](http://eigen.tuxfamily.org) (newer versions strongly recommended)
  * [CMake](http://www.cmake.org/)
 
-#### Checking out the project for the first time
-
-The first time you clone the repository, you need to sync the `cnn/` submodule.
-
-    git submodule init
-    git submodule update
-
 #### Build instructions
 
     mkdir build

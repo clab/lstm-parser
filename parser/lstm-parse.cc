@@ -480,6 +480,186 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
   cout << endl;
 }
 
+void do_train(Model model, unsigned status_every_i_iterations,
+    const unsigned unk_strategy, const set<unsigned>& singletons,
+    const double unk_prob, const unsigned kUNK,
+    const set<unsigned>& training_vocab, int best_correct_heads,
+    const string& fname, bool softlinkCreated, ParserBuilder* parser) {
+  signal(SIGINT, signal_callback_handler);
+  SimpleSGDTrainer sgd(&model);
+  //MomentumSGDTrainer sgd(&model);
+  sgd.eta_decay = 0.08;
+  //sgd.eta_decay = 0.05;
+  vector<unsigned> order(corpus.nsentences);
+  for (unsigned i = 0; i < corpus.nsentences; ++i)
+    order[i] = i;
+  double tot_seen = 0;
+  status_every_i_iterations = min(status_every_i_iterations, corpus.nsentences);
+  unsigned si = corpus.nsentences;
+  cerr << "NUMBER OF TRAINING SENTENCES: " << corpus.nsentences << endl;
+  unsigned trs = 0;
+  double right = 0;
+  double llh = 0;
+  bool first = true;
+  int iter = -1;
+  time_t time_start = std::chrono::system_clock::to_time_t(
+      std::chrono::system_clock::now());
+  cerr << "TRAINING STARTED AT: " << put_time(localtime(&time_start), "%c %Z")
+       << endl;
+  while (!requested_stop) {
+    ++iter;
+    for (unsigned sii = 0; sii < status_every_i_iterations; ++sii) {
+      if (si == corpus.nsentences) {
+        si = 0;
+        if (first) {
+          first = false;
+        } else {
+          sgd.update_epoch();
+        }
+        cerr << "**SHUFFLE\n";
+        random_shuffle(order.begin(), order.end());
+      }
+      tot_seen += 1;
+      const vector<unsigned>& sentence = corpus.sentences[order[si]];
+      vector<unsigned> tsentence = sentence;
+      if (unk_strategy == 1) {
+        for (auto& w : tsentence) {
+          if (singletons.count(w) && cnn::rand01() < unk_prob) {
+            w = kUNK;
+          }
+        }
+      }
+      const vector<unsigned>& sentencePos = corpus.sentencesPos[order[si]];
+      const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
+      ComputationGraph hg;
+      parser->log_prob_parser(&hg, sentence, tsentence, sentencePos, actions,
+          corpus.actions, corpus.intToWords, &right);
+      double lp = as_scalar(hg.incremental_forward());
+      if (lp < 0) {
+        cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp
+            << endl;
+        assert(lp >= 0.0);
+      }
+      hg.backward();
+      sgd.update(1.0);
+      llh += lp;
+      ++si;
+      trs += actions.size();
+    }
+    sgd.status();
+    time_t time_now = std::chrono::system_clock::to_time_t(
+        std::chrono::system_clock::now());
+    cerr << "update #" << iter << " (epoch " << (tot_seen / corpus.nsentences)
+         << " |time=" << put_time(localtime(&time_now), "%c %Z") << ")\tllh: "
+         << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs
+         << endl;
+    llh = trs = right = 0;
+    static int logc = 0;
+    ++logc;
+    if (logc % 25 == 1) {
+      // report on dev set
+      unsigned dev_size = corpus.nsentencesDev;
+      // dev_size = 100;
+      double llh = 0;
+      double trs = 0;
+      double right = 0;
+      double correct_heads = 0;
+      double total_heads = 0;
+      auto t_start = std::chrono::high_resolution_clock::now();
+      for (unsigned sii = 0; sii < dev_size; ++sii) {
+        const vector<unsigned>& sentence = corpus.sentencesDev[sii];
+        const vector<unsigned>& sentencePos = corpus.sentencesPosDev[sii];
+        const vector<unsigned>& actions = corpus.correct_act_sentDev[sii];
+        vector<unsigned> tsentence = sentence;
+        for (auto& w : tsentence)
+          if (training_vocab.count(w) == 0)
+            w = kUNK;
+        ComputationGraph hg;
+        vector<unsigned> pred = parser->log_prob_parser(&hg, sentence,
+            tsentence, sentencePos, vector<unsigned>(), corpus.actions,
+            corpus.intToWords, &right);
+        double lp = 0;
+        llh -= lp;
+        trs += actions.size();
+        map<int, int> ref = parser->compute_heads(sentence.size(), actions,
+            corpus.actions);
+        map<int, int> hyp = parser->compute_heads(sentence.size(), pred,
+            corpus.actions);
+        //output_conll(sentence, corpus.intToWords, ref, hyp);
+        correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
+        total_heads += sentence.size() - 1;
+      }
+      auto t_end = std::chrono::high_resolution_clock::now();
+      cerr << "  **dev (iter=" << iter << " epoch="
+           << (tot_seen / corpus.nsentences) << ")\tllh=" << llh << " ppl: "
+           << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: "
+           << (correct_heads / total_heads) << "\t[" << dev_size << " sents in "
+           << std::chrono::duration<double, std::milli>(t_end - t_start).count()
+           << " ms]" << endl;
+      if (correct_heads > best_correct_heads) {
+        best_correct_heads = correct_heads;
+        ofstream out(fname);
+        boost::archive::text_oarchive oa(out);
+        oa << model;
+        // Create a soft link to the most recent model in order to make it
+        // easier to refer to it in a shell script.
+        if (!softlinkCreated) {
+          string softlink = " latest_model";
+          if (system((string("rm -f ") + softlink).c_str()) == 0
+              && system((string("ln -s ") + fname + softlink).c_str()) == 0) {
+            cerr << "Created " << softlink << " as a soft link to " << fname
+                 << " for convenience." << endl;
+          }
+          softlinkCreated = true;
+        }
+      }
+    }
+  }
+}
+
+void do_test(const set<unsigned>& training_vocab, const unsigned kUNK,
+    ParserBuilder* parser) {
+  // do test evaluation
+  double llh = 0;
+  double trs = 0;
+  double right = 0;
+  double correct_heads = 0;
+  double total_heads = 0;
+  auto t_start = std::chrono::high_resolution_clock::now();
+  unsigned corpus_size = corpus.nsentencesDev;
+  for (unsigned sii = 0; sii < corpus_size; ++sii) {
+    const vector<unsigned>& sentence = corpus.sentencesDev[sii];
+    const vector<unsigned>& sentencePos = corpus.sentencesPosDev[sii];
+    const vector<string>& sentenceUnkStr = corpus.sentencesStrDev[sii];
+    const vector<unsigned>& actions = corpus.correct_act_sentDev[sii];
+    vector<unsigned> tsentence = sentence;
+    for (auto& w : tsentence)
+      if (training_vocab.count(w) == 0)
+        w = kUNK;
+    ComputationGraph cg;
+    double lp = 0;
+    vector<unsigned> pred;
+    pred = parser->log_prob_parser(&cg, sentence, tsentence, sentencePos,
+        vector<unsigned>(), corpus.actions, corpus.intToWords, &right);
+    llh -= lp;
+    trs += actions.size();
+    map<int, string> rel_ref, rel_hyp;
+    map<int, int> ref = parser->compute_heads(sentence.size(), actions,
+        corpus.actions, &rel_ref);
+    map<int, int> hyp = parser->compute_heads(sentence.size(), pred,
+        corpus.actions, &rel_hyp);
+    output_conll(sentence, sentencePos, sentenceUnkStr, corpus.intToWords,
+        corpus.intToPos, hyp, rel_hyp);
+    correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
+    total_heads += sentence.size() - 1;
+  }
+  auto t_end = std::chrono::high_resolution_clock::now();
+  cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: "
+       << (trs - right) / trs << " uas: " << (correct_heads / total_heads)
+       << "\t[" << corpus_size << " sents in "
+       << std::chrono::duration<double, std::milli>(t_end - t_start).count()
+       << " ms]" << endl;
+}
 
 int main(int argc, char** argv) {
   cnn::Initialize(argc, argv);
@@ -575,144 +755,12 @@ int main(int argc, char** argv) {
   corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
   //TRAINING
   if (conf.count("train")) {
-    signal(SIGINT, signal_callback_handler);
-    SimpleSGDTrainer sgd(&model);
-    //MomentumSGDTrainer sgd(&model);
-    sgd.eta_decay = 0.08;
-    //sgd.eta_decay = 0.05;
-    vector<unsigned> order(corpus.nsentences);
-    for (unsigned i = 0; i < corpus.nsentences; ++i)
-      order[i] = i;
-    double tot_seen = 0;
-    status_every_i_iterations = min(status_every_i_iterations, corpus.nsentences);
-    unsigned si = corpus.nsentences;
-    cerr << "NUMBER OF TRAINING SENTENCES: " << corpus.nsentences << endl;
-    unsigned trs = 0;
-    double right = 0;
-    double llh = 0;
-    bool first = true;
-    int iter = -1;
-    time_t time_start = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-    cerr << "TRAINING STARTED AT: " << put_time(localtime(&time_start), "%c %Z") << endl;
-    while(!requested_stop) {
-      ++iter;
-      for (unsigned sii = 0; sii < status_every_i_iterations; ++sii) {
-           if (si == corpus.nsentences) {
-             si = 0;
-             if (first) { first = false; } else { sgd.update_epoch(); }
-             cerr << "**SHUFFLE\n";
-             random_shuffle(order.begin(), order.end());
-           }
-           tot_seen += 1;
-           const vector<unsigned>& sentence=corpus.sentences[order[si]];
-           vector<unsigned> tsentence=sentence;
-           if (unk_strategy == 1) {
-             for (auto& w : tsentence)
-               if (singletons.count(w) && cnn::rand01() < unk_prob) w = kUNK;
-           }
-	   const vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]];
-	   const vector<unsigned>& actions=corpus.correct_act_sent[order[si]];
-           ComputationGraph hg;
-           parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,actions,corpus.actions,corpus.intToWords,&right);
-           double lp = as_scalar(hg.incremental_forward());
-           if (lp < 0) {
-             cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp << endl;
-             assert(lp >= 0.0);
-           }
-           hg.backward();
-           sgd.update(1.0);
-           llh += lp;
-           ++si;
-           trs += actions.size();
-      }
-      sgd.status();
-      time_t time_now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-      cerr << "update #" << iter << " (epoch " << (tot_seen / corpus.nsentences) << " |time=" << put_time(localtime(&time_now), "%c %Z") << ")\tllh: "<< llh<<" ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << endl;
-      llh = trs = right = 0;
-
-      static int logc = 0;
-      ++logc;
-      if (logc % 25 == 1) { // report on dev set
-        unsigned dev_size = corpus.nsentencesDev;
-        // dev_size = 100;
-        double llh = 0;
-        double trs = 0;
-        double right = 0;
-        double correct_heads = 0;
-        double total_heads = 0;
-        auto t_start = std::chrono::high_resolution_clock::now();
-        for (unsigned sii = 0; sii < dev_size; ++sii) {
-           const vector<unsigned>& sentence=corpus.sentencesDev[sii];
-	   const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii];
-	   const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
-           vector<unsigned> tsentence=sentence;
-           for (auto& w : tsentence)
-             if (training_vocab.count(w) == 0) w = kUNK;
-
-           ComputationGraph hg;
-	   vector<unsigned> pred = parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,vector<unsigned>(),corpus.actions,corpus.intToWords,&right);
-	   double lp = 0;
-           llh -= lp;
-           trs += actions.size();
-           map<int,int> ref = parser.compute_heads(sentence.size(), actions, corpus.actions);
-           map<int,int> hyp = parser.compute_heads(sentence.size(), pred, corpus.actions);
-           //output_conll(sentence, corpus.intToWords, ref, hyp);
-           correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
-           total_heads += sentence.size() - 1;
-        }
-        auto t_end = std::chrono::high_resolution_clock::now();
-        cerr << "  **dev (iter=" << iter << " epoch=" << (tot_seen / corpus.nsentences) << ")\tllh=" << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: " << (correct_heads / total_heads) << "\t[" << dev_size << " sents in " << std::chrono::duration<double, std::milli>(t_end-t_start).count() << " ms]" << endl;
-        if (correct_heads > best_correct_heads) {
-          best_correct_heads = correct_heads;
-          ofstream out(fname);
-          boost::archive::text_oarchive oa(out);
-          oa << model;
-          // Create a soft link to the most recent model in order to make it
-          // easier to refer to it in a shell script.
-          if (!softlinkCreated) {
-            string softlink = " latest_model";
-            if (system((string("rm -f ") + softlink).c_str()) == 0 &&
-                system((string("ln -s ") + fname + softlink).c_str()) == 0) {
-              cerr << "Created " << softlink << " as a soft link to " << fname
-                   << " for convenience." << endl;
-            }
-            softlinkCreated = true;
-          }
-        }
-      }
-    }
+		do_train(model, status_every_i_iterations, unk_strategy, singletons,
+				unk_prob, kUNK, training_vocab, best_correct_heads, fname,
+				softlinkCreated, &parser);
   } // should do training?
   if (true) { // do test evaluation
-    double llh = 0;
-    double trs = 0;
-    double right = 0;
-    double correct_heads = 0;
-    double total_heads = 0;
-    auto t_start = std::chrono::high_resolution_clock::now();
-    unsigned corpus_size = corpus.nsentencesDev;
-    for (unsigned sii = 0; sii < corpus_size; ++sii) {
-      const vector<unsigned>& sentence=corpus.sentencesDev[sii];
-      const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii];
-      const vector<string>& sentenceUnkStr=corpus.sentencesStrDev[sii];
-      const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
-      vector<unsigned> tsentence=sentence;
-      for (auto& w : tsentence)
-        if (training_vocab.count(w) == 0) w = kUNK;
-      ComputationGraph cg;
-      double lp = 0;
-      vector<unsigned> pred;
-      pred = parser.log_prob_parser(&cg,sentence,tsentence,sentencePos,vector<unsigned>(),corpus.actions,corpus.intToWords,&right);
-      llh -= lp;
-      trs += actions.size();
-      map<int, string> rel_ref, rel_hyp;
-      map<int,int> ref = parser.compute_heads(sentence.size(), actions, corpus.actions, &rel_ref);
-      map<int,int> hyp = parser.compute_heads(sentence.size(), pred, corpus.actions, &rel_hyp);
-      output_conll(sentence, sentencePos, sentenceUnkStr, corpus.intToWords, corpus.intToPos, hyp, rel_hyp);
-      correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
-      total_heads += sentence.size() - 1;
-    }
-    auto t_end = std::chrono::high_resolution_clock::now();
-    cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: " << (correct_heads / total_heads) << "\t[" << corpus_size << " sents in " << std::chrono::duration<double, std::milli>(t_end-t_start).count() << " ms]" << endl;
+    do_test(training_vocab, kUNK, &parser);
   }
   for (unsigned i = 0; i < corpus.actions.size(); ++i) {
     //cerr << corpus.actions[i] << '\t' << parser.p_r->values[i].transpose() << endl;

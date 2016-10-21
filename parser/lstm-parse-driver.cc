@@ -280,7 +280,8 @@ void do_train(ParserBuilder* parser, Model *model, const unsigned unk_strategy,
         if (!softlinkCreated) {
           string softlink = "latest_model.params";
           if (system((string("rm -f ") + softlink).c_str()) == 0
-              && system((string("ln -s ") + fname + " " + softlink).c_str()) == 0) {
+              && system((string("ln -s ") + fname + " " + softlink).c_str())
+                  == 0) {
             cerr << "Created " << softlink << " as a soft link to " << fname
                  << " for convenience." << endl;
           }
@@ -415,8 +416,8 @@ int main(int argc, char** argv) {
        << "-pid" << getpid() << ".params";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    do_train(&parser, &model, unk_strategy, singletons, unk_prob, training_vocab,
-             fname);
+    do_train(&parser, &model, unk_strategy, singletons, unk_prob,
+             training_vocab, fname);
   }
   if (test) { // do test evaluation
     do_test(&parser, training_vocab);

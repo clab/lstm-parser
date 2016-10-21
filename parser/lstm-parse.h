@@ -90,6 +90,7 @@ public:
                        double *right);
 
   void LoadPretrainedWords(const string& words_path, unsigned pretrained_dim) {
+    // TODO: make it load word vector dimension automatically
     pretrained[kUNK] = vector<float>(pretrained_dim, 0);
     cerr << "Loading from " << words_path << " with " << pretrained_dim
          << " dimensions\n";

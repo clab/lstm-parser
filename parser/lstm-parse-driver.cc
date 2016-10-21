@@ -41,9 +41,8 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   po::options_description opts("Configuration options");
   opts.add_options()
         ("training_data,T", po::value<string>(),
-         "List of Transitions - Training corpus")
+         "List of transitions - training corpus")
         ("dev_data,d", po::value<string>(), "Development corpus")
-        ("test_data,p", po::value<string>(), "Test corpus")
         ("unk_strategy,o", po::value<unsigned>()->default_value(1),
          "Unknown word strategy: 1 = singletons become UNK with probability"
          " unk_prob")
@@ -282,9 +281,9 @@ void do_train(Model *model, const unsigned unk_strategy,
         // Create a soft link to the most recent model in order to make it
         // easier to refer to it in a shell script.
         if (!softlinkCreated) {
-          string softlink = " latest_model";
+          string softlink = "latest_model.params";
           if (system((string("rm -f ") + softlink).c_str()) == 0
-              && system((string("ln -s ") + fname + softlink).c_str()) == 0) {
+              && system((string("ln -s ") + fname + " " + softlink).c_str()) == 0) {
             cerr << "Created " << softlink << " as a soft link to " << fname
                  << " for convenience." << endl;
           }
@@ -376,18 +375,6 @@ int main(int argc, char** argv) {
     abort();
   }
   assert(unk_prob >= 0.); assert(unk_prob <= 1.);
-  ostringstream os;
-  os << "parser_" << (use_pos ? "pos" : "nopos")
-     << '_' << layers
-     << '_' << input_dim
-     << '_' << hidden_dim
-     << '_' << action_dim
-     << '_' << lstm_input_dim
-     << '_' << pos_dim
-     << '_' << rel_dim
-     << "-pid" << getpid() << ".params";
-  const string fname = os.str();
-  cerr << "Writing parameters to file: " << fname << endl;
 
   Model model;
   ParserBuilder parser(&model, conf["training_data"].as<string>(),
@@ -420,7 +407,19 @@ int main(int argc, char** argv) {
   // OOV words will be replaced by UNK tokens
   parser.corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
   if (train) {
-        do_train(&model, unk_strategy, singletons, unk_prob, training_vocab,
+    ostringstream os;
+    os << "parser_" << (use_pos ? "pos" : "nopos")
+       << '_' << layers
+       << '_' << input_dim
+       << '_' << hidden_dim
+       << '_' << action_dim
+       << '_' << lstm_input_dim
+       << '_' << pos_dim
+       << '_' << rel_dim
+       << "-pid" << getpid() << ".params";
+    const string fname = os.str();
+    cerr << "Writing parameters to file: " << fname << endl;
+    do_train(&model, unk_strategy, singletons, unk_prob, training_vocab,
                  fname, &parser);
   }
   if (test) { // do test evaluation

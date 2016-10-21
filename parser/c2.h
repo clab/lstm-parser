@@ -98,6 +98,7 @@ inline unsigned UTF8Len(unsigned char x) {
 
 
 inline void load_correct_actions(const std::string &file){
+  std::cerr << "Loading corpus from " << file << "...";
   std::ifstream actionsFile(file);
   //correct_act_sent=new vector<vector<unsigned>>();
   std::string lineS;
@@ -197,8 +198,8 @@ inline void load_correct_actions(const std::string &file){
       for (auto a: actions) {
         if (a==lineS) {
           std::vector<unsigned> a=correct_act_sent[sentence];
-                                  a.push_back(i);
-                                  correct_act_sent[sentence]=a;
+          a.push_back(i);
+          correct_act_sent[sentence]=a;
           found=true;
         }
         i++;
@@ -232,18 +233,17 @@ inline void load_correct_actions(const std::string &file){
         nwords=max;
         max++;*/
 
-  std::cerr<<"done"<<"\n";
-  for (auto a: actions) {
-    std::cerr<<a<<"\n";
+  std::cerr << "done." << "\n";
+  for (auto a : actions) {
+    std::cerr << a << "\n";
   }
   nactions=actions.size();
   std::cerr<<"nactions:"<<nactions<<"\n";
-        std::cerr<<"nwords:"<<nwords<<"\n";
+  std::cerr<<"nwords:"<<nwords<<"\n";
   for (unsigned i=0;i<npos;i++){
-                std::cerr<<i<<":"<<intToPos[i]<<"\n";
-        }
+    std::cerr<<i<<":"<<intToPos[i]<<"\n";
+  }
   nactions=actions.size();
-
 }
 
 inline unsigned get_or_add_word(const std::string& word) {

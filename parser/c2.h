@@ -66,10 +66,21 @@ public:
 
  
  public:
-  Corpus() {
-    max = 0;
-    maxPos = 0;
-    maxChars=0; //Miguel
+  Corpus(const std::string &file) {
+    wordsToInt[Corpus::BAD0] = 0;
+    intToWords[0] = Corpus::BAD0;
+    wordsToInt[Corpus::UNK] = 1; // unknown symbol
+    intToWords[1] = Corpus::UNK;
+    max=2;
+    maxPos=1;
+
+    charsToInt[BAD0]=1;
+    intToChars[1]="BAD0";
+    maxChars=1;
+
+    npos = 0;
+
+    load_correct_actions(file);
   }
 
 
@@ -86,55 +97,42 @@ inline unsigned UTF8Len(unsigned char x) {
 
 
 
-inline void load_correct_actions(std::string file){
-	
+inline void load_correct_actions(const std::string &file){
   std::ifstream actionsFile(file);
   //correct_act_sent=new vector<vector<unsigned>>();
   std::string lineS;
-	
+
   int count=-1;
   int sentence=-1;
   bool initial=false;
   bool first=true;
-  wordsToInt[Corpus::BAD0] = 0;
-  intToWords[0] = Corpus::BAD0;
-  wordsToInt[Corpus::UNK] = 1; // unknown symbol
-  intToWords[1] = Corpus::UNK;
-  assert(max == 0);
-  assert(maxPos == 0);
-  max=2;
-  maxPos=1;
   
-  charsToInt[BAD0]=1;
-  intToChars[1]="BAD0";
-  maxChars=1;
-  
-	std::vector<unsigned> current_sent;
+  std::vector<unsigned> current_sent;
   std::vector<unsigned> current_sent_pos;
   while (getline(actionsFile, lineS)){
     //istringstream iss(line);
     //string lineS;
- 		//iss>>lineS;
+    //iss >> lineS;
     ReplaceStringInPlace(lineS, "-RRB-", "_RRB_");
     ReplaceStringInPlace(lineS, "-LRB-", "_LRB_");
-		if (lineS.empty()) {
-			count = 0;
-			if (!first) {
-				sentences[sentence] = current_sent;
-				sentencesPos[sentence] = current_sent_pos;
+    if (lineS.empty()) {
+      count = 0;
+      if (!first) {
+        sentences[sentence] = current_sent;
+        sentencesPos[sentence] = current_sent_pos;
       }
       
-			sentence++;
-			nsentences = sentence;
+      sentence++;
+      nsentences = sentence;
       
-			initial = true;
+      initial = true;
       current_sent.clear();
-			current_sent_pos.clear();
-		} else if (count == 0) {
-			first = false;
-			//stack and buffer, for now, leave it like this.
-			count = 1;
-			if (initial) {
+      current_sent_pos.clear();
+    } else if (count == 0) {
+      first = false;
+      //stack and buffer, for now, leave it like this.
+      count = 1;
+      if (initial) {
         // the initial line in each sentence may look like:
         // [][the-det, cat-noun, is-verb, on-adp, the-det, mat-noun, ,-punct, ROOT-ROOT]
         // first, get rid of the square brackets.
@@ -190,30 +188,30 @@ inline void load_correct_actions(std::string file){
           current_sent.push_back(wordsToInt[word]);
           current_sent_pos.push_back(posToInt[pos]);
         } while(iss);
-			}
-			initial=false;
-		}
-		else if (count==1){
-			int i=0;
-			bool found=false;
-			for (auto a: actions) {
-				if (a==lineS) {
-					std::vector<unsigned> a=correct_act_sent[sentence];
-	                                a.push_back(i);
-        	                        correct_act_sent[sentence]=a;
-					found=true;
-				}
-				i++;
-			}
-			if (!found) {
-				actions.push_back(lineS);
-				std::vector<unsigned> a=correct_act_sent[sentence];
-				a.push_back(actions.size()-1);
-				correct_act_sent[sentence]=a;
-			}
-			count=0;
-		}
-	}
+      }
+      initial=false;
+    }
+    else if (count==1){
+      int i=0;
+      bool found=false;
+      for (auto a: actions) {
+        if (a==lineS) {
+          std::vector<unsigned> a=correct_act_sent[sentence];
+                                  a.push_back(i);
+                                  correct_act_sent[sentence]=a;
+          found=true;
+        }
+        i++;
+      }
+      if (!found) {
+        actions.push_back(lineS);
+        std::vector<unsigned> a=correct_act_sent[sentence];
+        a.push_back(actions.size()-1);
+        correct_act_sent[sentence]=a;
+      }
+      count=0;
+    }
+  }
 
   // Add the last sentence.
   if (current_sent.size() > 0) {
@@ -224,8 +222,8 @@ inline void load_correct_actions(std::string file){
   }
       
   actionsFile.close();
-/*	std::string oov="oov";
-	posToInt[oov]=maxPos;
+/*  std::string oov="oov";
+  posToInt[oov]=maxPos;
         intToPos[maxPos]=oov;
         npos=maxPos;
         maxPos++;
@@ -234,18 +232,18 @@ inline void load_correct_actions(std::string file){
         nwords=max;
         max++;*/
 
-	std::cerr<<"done"<<"\n";
-	for (auto a: actions) {
-		std::cerr<<a<<"\n";
-	}
-	nactions=actions.size();
-	std::cerr<<"nactions:"<<nactions<<"\n";
+  std::cerr<<"done"<<"\n";
+  for (auto a: actions) {
+    std::cerr<<a<<"\n";
+  }
+  nactions=actions.size();
+  std::cerr<<"nactions:"<<nactions<<"\n";
         std::cerr<<"nwords:"<<nwords<<"\n";
-	for (unsigned i=0;i<npos;i++){
+  for (unsigned i=0;i<npos;i++){
                 std::cerr<<i<<":"<<intToPos[i]<<"\n";
         }
-	nactions=actions.size();
-	
+  nactions=actions.size();
+
 }
 
 inline unsigned get_or_add_word(const std::string& word) {

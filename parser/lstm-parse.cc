@@ -42,12 +42,12 @@ ParserBuilder::ParserBuilder(Model* model, const string& training_path,
                              unsigned pretrained_dim, unsigned rel_dim,
                              unsigned action_dim, unsigned pos_dim,
                              unsigned input_dim, unsigned layers) :
+      corpus(training_path),
       kUNK(corpus.get_or_add_word(cpyp::Corpus::UNK)),
       kROOT_SYMBOL(corpus.get_or_add_word(ROOT_SYMBOL)),
       stack_lstm(layers, lstm_input_dim, hidden_dim, model),
       buffer_lstm(layers, lstm_input_dim, hidden_dim, model),
       action_lstm(layers, action_dim, hidden_dim, model) {
-  corpus.load_correct_actions(training_path);
   // First load words if needed before creating network parameters.
   // That will ensure that the corpus has the final number of words.
   if (!pretrained_words_path.empty()) {

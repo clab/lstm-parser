@@ -16,7 +16,8 @@ using namespace cnn;
 using namespace std;
 
 
-struct ParserBuilder {
+class ParserBuilder {
+public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
   bool use_pos;
@@ -66,7 +67,7 @@ struct ParserBuilder {
 
   // take a vector of actions and return a parse tree (labeling of every
   // word position with its head's position)
-  static map<int, int> compute_heads(unsigned sent_len,
+  static map<int, int> ComputeHeads(unsigned sent_len,
                                      const vector<unsigned>& actions,
                                      const vector<string>& setOfActions,
                                      map<int, string>* pr = nullptr);
@@ -78,7 +79,7 @@ struct ParserBuilder {
   //               sent will have words replaced by appropriate UNK tokens
   // this lets us use pretrained embeddings, when available, for words that were
   // OOV in the parser training data.
-  vector<unsigned> log_prob_parser(ComputationGraph* hg,
+  vector<unsigned> LogProbParser(ComputationGraph* hg,
                        const vector<unsigned>& raw_sent,  // raw sentence
                        const vector<unsigned>& sent,  // sent with oovs replaced
                        const vector<unsigned>& sentPos,

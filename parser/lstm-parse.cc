@@ -120,7 +120,7 @@ bool ParserBuilder::IsActionForbidden(const string& a, unsigned bsize,
 }
 
 
-map<int,int> ParserBuilder::compute_heads(unsigned sent_len,
+map<int,int> ParserBuilder::ComputeHeads(unsigned sent_len,
                                           const vector<unsigned>& actions,
                                           const vector<string>& setOfActions,
                                           map<int,string>* pr) {
@@ -168,7 +168,7 @@ map<int,int> ParserBuilder::compute_heads(unsigned sent_len,
 }
 
 
-vector<unsigned> ParserBuilder::log_prob_parser(ComputationGraph* hg,
+vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
                    const vector<unsigned>& raw_sent,  // raw sentence
                    const vector<unsigned>& sent,  // sent with oovs replaced
                    const vector<unsigned>& sentPos,

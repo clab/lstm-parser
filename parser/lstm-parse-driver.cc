@@ -205,7 +205,7 @@ void do_train(Model model, const unsigned unk_strategy,
       const vector<unsigned>& sentencePos = corpus.sentencesPos[order[si]];
       const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
       ComputationGraph hg;
-      parser->log_prob_parser(&hg, sentence, tsentence, sentencePos, actions,
+      parser->LogProbParser(&hg, sentence, tsentence, sentencePos, actions,
           corpus.actions, corpus.intToWords, &right);
       double lp = as_scalar(hg.incremental_forward());
       if (lp < 0) {
@@ -248,15 +248,15 @@ void do_train(Model model, const unsigned unk_strategy,
           if (training_vocab.count(w) == 0)
             w = parser->kUNK;
         ComputationGraph hg;
-        vector<unsigned> pred = parser->log_prob_parser(&hg, sentence,
+        vector<unsigned> pred = parser->LogProbParser(&hg, sentence,
             tsentence, sentencePos, vector<unsigned>(), corpus.actions,
             corpus.intToWords, &right);
         double lp = 0;
         llh -= lp;
         trs += actions.size();
-        map<int, int> ref = parser->compute_heads(sentence.size(), actions,
+        map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
             corpus.actions);
-        map<int, int> hyp = parser->compute_heads(sentence.size(), pred,
+        map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
             corpus.actions);
         //output_conll(sentence, corpus.intToWords, ref, hyp);
         correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
@@ -312,14 +312,14 @@ void do_test(const set<unsigned>& training_vocab, ParserBuilder* parser) {
     ComputationGraph cg;
     double lp = 0;
     vector<unsigned> pred;
-    pred = parser->log_prob_parser(&cg, sentence, tsentence, sentencePos,
+    pred = parser->LogProbParser(&cg, sentence, tsentence, sentencePos,
         vector<unsigned>(), corpus.actions, corpus.intToWords, &right);
     llh -= lp;
     trs += actions.size();
     map<int, string> rel_ref, rel_hyp;
-    map<int, int> ref = parser->compute_heads(sentence.size(), actions,
+    map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
         corpus.actions, &rel_ref);
-    map<int, int> hyp = parser->compute_heads(sentence.size(), pred,
+    map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
         corpus.actions, &rel_hyp);
     output_conll(sentence, sentencePos, sentenceUnkStr, corpus.intToWords,
         corpus.intToPos, hyp, rel_hyp);
@@ -355,13 +355,16 @@ int main(int argc, char** argv) {
   const unsigned pos_dim = conf["pos_dim"].as<unsigned>();
   const unsigned rel_dim = conf["rel_dim"].as<unsigned>();
   const unsigned unk_strategy = conf["unk_strategy"].as<unsigned>();
+  const double unk_prob = conf["unk_prob"].as<double>();
+  const bool train = conf.count("train");
+  const bool test = conf.count("test");
+
   cerr << "Unknown word strategy: ";
   if (unk_strategy == 1) {
     cerr << "STOCHASTIC REPLACEMENT\n";
   } else {
     abort();
   }
-  const double unk_prob = conf["unk_prob"].as<double>();
   assert(unk_prob >= 0.); assert(unk_prob <= 1.);
   ostringstream os;
   os << "parser_" << (use_pos ? "pos" : "nopos")
@@ -387,8 +390,10 @@ int main(int argc, char** argv) {
         training_vocab.insert(word);
         counts[word]++;
       }
-    for (auto wc : counts)
-      if (wc.second == 1) singletons.insert(wc.first);
+    if (train) {
+      for (auto wc : counts)
+        if (wc.second == 1) singletons.insert(wc.first);
+    }
   }
 
   Model model;
@@ -406,11 +411,11 @@ int main(int argc, char** argv) {
   // OOV words will be replaced by UNK tokens
   corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
   //TRAINING
-  if (conf.count("train")) {
+  if (train) {
         do_train(model, unk_strategy, singletons, unk_prob, training_vocab,
                  fname, &parser);
   }
-  if (conf.count("test")) { // do test evaluation
+  if (test) { // do test evaluation
     do_test(training_vocab, &parser);
   }
   for (unsigned i = 0; i < corpus.actions.size(); ++i) {

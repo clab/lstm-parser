@@ -20,6 +20,7 @@ class ParserBuilder {
 public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
+  cpyp::Corpus corpus;
   bool use_pos;
   unsigned vocab_size;
   unsigned action_size;
@@ -28,7 +29,6 @@ public:
   size_t n_possible_actions;
   const unsigned kUNK;
   const unsigned kROOT_SYMBOL;
-  cpyp::Corpus corpus;
 
   LSTMBuilder stack_lstm; // (layers, input, hidden, trainer)
   LSTMBuilder buffer_lstm;

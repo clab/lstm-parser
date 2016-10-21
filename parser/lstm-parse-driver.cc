@@ -162,6 +162,7 @@ void do_train(Model *model, const unsigned unk_strategy,
   //MomentumSGDTrainer sgd(model);
   sgd.eta_decay = 0.08;
   //sgd.eta_decay = 0.05;
+  const cpyp::Corpus& corpus = parser->corpus;
   vector<unsigned> order(corpus.nsentences);
   for (unsigned i = 0; i < corpus.nsentences; ++i)
     order[i] = i;
@@ -192,7 +193,8 @@ void do_train(Model *model, const unsigned unk_strategy,
         random_shuffle(order.begin(), order.end());
       }
       tot_seen += 1;
-      const vector<unsigned>& sentence = corpus.sentences[order[si]];
+      const vector<unsigned>& sentence =
+          corpus.sentences.find(order[si])->second;
       vector<unsigned> tsentence = sentence;
       if (unk_strategy == 1) {
         for (auto& w : tsentence) {
@@ -201,8 +203,10 @@ void do_train(Model *model, const unsigned unk_strategy,
           }
         }
       }
-      const vector<unsigned>& sentencePos = corpus.sentencesPos[order[si]];
-      const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
+      const vector<unsigned>& sentencePos =
+          corpus.sentencesPos.find(order[si])->second;
+      const vector<unsigned>& actions =
+          corpus.correct_act_sent.find(order[si])->second;
       ComputationGraph hg;
       parser->LogProbParser(&hg, sentence, tsentence, sentencePos, actions,
           corpus.actions, corpus.intToWords, &right);
@@ -239,9 +243,12 @@ void do_train(Model *model, const unsigned unk_strategy,
       double total_heads = 0;
       auto t_start = std::chrono::high_resolution_clock::now();
       for (unsigned sii = 0; sii < dev_size; ++sii) {
-        const vector<unsigned>& sentence = corpus.sentencesDev[sii];
-        const vector<unsigned>& sentencePos = corpus.sentencesPosDev[sii];
-        const vector<unsigned>& actions = corpus.correct_act_sentDev[sii];
+        const vector<unsigned>& sentence =
+            corpus.sentencesDev.find(sii)->second;
+        const vector<unsigned>& sentencePos =
+            corpus.sentencesPosDev.find(sii)->second;
+        const vector<unsigned>& actions =
+            corpus.correct_act_sentDev.find(sii)->second;
         vector<unsigned> tsentence = sentence;
         for (auto& w : tsentence)
           if (training_vocab.count(w) == 0)
@@ -300,10 +307,13 @@ void do_test(const set<unsigned>& training_vocab, ParserBuilder* parser) {
   const cpyp::Corpus& corpus = parser->corpus;
   unsigned corpus_size = corpus.nsentencesDev;
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
-    const vector<unsigned>& sentence = corpus.sentencesDev[sii];
-    const vector<unsigned>& sentencePos = corpus.sentencesPosDev[sii];
-    const vector<string>& sentenceUnkStr = corpus.sentencesStrDev[sii];
-    const vector<unsigned>& actions = corpus.correct_act_sentDev[sii];
+    const vector<unsigned>& sentence = corpus.sentencesDev.find(sii)->second;
+    const vector<unsigned>& sentencePos =
+        corpus.sentencesPosDev.find(sii)->second;
+    const vector<string>& sentenceUnkStr =
+        corpus.sentencesStrDev.find(sii)->second;
+    const vector<unsigned>& actions =
+        corpus.correct_act_sentDev.find(sii)->second;
     vector<unsigned> tsentence = sentence;
     for (auto& w : tsentence)
       if (training_vocab.count(w) == 0)
@@ -394,7 +404,7 @@ int main(int argc, char** argv) {
   set<unsigned> singletons;
   {  // compute the singletons in the parser's training data
     map<unsigned, unsigned> counts;
-    for (auto sent : corpus.sentences)
+    for (auto sent : parser.corpus.sentences)
       for (auto word : sent.second) {
         training_vocab.insert(word);
         counts[word]++;
@@ -405,10 +415,10 @@ int main(int argc, char** argv) {
     }
   }
 
-  cerr << "Number of words: " << corpus.nwords << endl;
+  cerr << "Total number of words: " << parser.corpus.nwords << endl;
 
   // OOV words will be replaced by UNK tokens
-  corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
+  parser.corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
   if (train) {
         do_train(&model, unk_strategy, singletons, unk_prob, training_vocab,
                  fname, &parser);

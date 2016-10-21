@@ -380,10 +380,10 @@ int main(int argc, char** argv) {
   cerr << "Writing parameters to file: " << fname << endl;
 
   Model model;
-  ParserBuilder parser(&model, conf["words"].as<string>(),
-                       conf["training_data"].as<string>(), use_pos,
-                       lstm_input_dim, hidden_dim, pretrained_dim, rel_dim,
-                       action_dim, pos_dim, input_dim, layers);
+  ParserBuilder parser(&model, conf["training_data"].as<string>(),
+                       conf["words"].as<string>(), use_pos, lstm_input_dim,
+                       hidden_dim, pretrained_dim, rel_dim, action_dim, pos_dim,
+                       input_dim, layers);
   if (conf.count("model")) {
     ifstream in(conf["model"].as<string>().c_str());
     boost::archive::text_iarchive ia(in);

@@ -58,8 +58,6 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
          "input embedding size")
         ("hidden_dim", po::value<unsigned>()->default_value(64),
          "hidden dimension")
-        ("pretrained_dim", po::value<unsigned>()->default_value(50),
-         "pretrained input dimension")
         ("pos_dim", po::value<unsigned>()->default_value(12), "POS dimension")
         ("rel_dim", po::value<unsigned>()->default_value(10),
          "relation dimension")
@@ -357,7 +355,6 @@ int main(int argc, char** argv) {
   const bool use_pos = conf.count("use_pos_tags");
   const unsigned layers = conf["layers"].as<unsigned>();
   const unsigned input_dim = conf["input_dim"].as<unsigned>();
-  const unsigned pretrained_dim = conf["pretrained_dim"].as<unsigned>();
   const unsigned hidden_dim = conf["hidden_dim"].as<unsigned>();
   const unsigned action_dim = conf["action_dim"].as<unsigned>();
   const unsigned lstm_input_dim = conf["lstm_input_dim"].as<unsigned>();
@@ -379,8 +376,8 @@ int main(int argc, char** argv) {
   Model model;
   ParserBuilder parser(&model, conf["training_data"].as<string>(),
                        conf["words"].as<string>(), use_pos, lstm_input_dim,
-                       hidden_dim, pretrained_dim, rel_dim, action_dim, pos_dim,
-                       input_dim, layers);
+                       hidden_dim, rel_dim, action_dim, pos_dim, input_dim,
+                       layers);
   if (conf.count("model")) {
     ifstream in(conf["model"].as<string>().c_str());
     boost::archive::text_iarchive ia(in);

@@ -39,9 +39,9 @@ constexpr const char* ParserBuilder::ROOT_SYMBOL;
 ParserBuilder::ParserBuilder(Model* model, const string& training_path,
                              const string& pretrained_words_path, bool use_pos,
                              unsigned lstm_input_dim, unsigned hidden_dim,
-                             unsigned pretrained_dim, unsigned rel_dim,
-                             unsigned action_dim, unsigned pos_dim,
-                             unsigned input_dim, unsigned layers) :
+                             unsigned rel_dim, unsigned action_dim,
+                             unsigned pos_dim, unsigned input_dim,
+                             unsigned layers) :
       corpus(training_path),
       kUNK(corpus.get_or_add_word(cpyp::Corpus::UNK)),
       kROOT_SYMBOL(corpus.get_or_add_word(ROOT_SYMBOL)),
@@ -51,11 +51,12 @@ ParserBuilder::ParserBuilder(Model* model, const string& training_path,
   // First load words if needed before creating network parameters.
   // That will ensure that the corpus has the final number of words.
   if (!pretrained_words_path.empty()) {
-    LoadPretrainedWords(pretrained_words_path, pretrained_dim);
+    LoadPretrainedWords(pretrained_words_path);
   }
   vocab_size = corpus.nwords + 1; // set here so that it's available for p_t
 
   if (!pretrained_words_path.empty()) {
+    unsigned pretrained_dim = pretrained.begin()->second.size();
     p_t = model->add_lookup_parameters(vocab_size, {pretrained_dim});
     for (auto it : pretrained)
       p_t->Initialize(it.first, it.second);

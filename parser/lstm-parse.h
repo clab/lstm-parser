@@ -59,9 +59,8 @@ public:
   explicit ParserBuilder(Model* model, const string& training_path,
                          const string& pretrained_words_path, bool use_pos,
                          unsigned lstm_input_dim, unsigned hidden_dim,
-                         unsigned pretrained_dim, unsigned rel_dim,
-                         unsigned action_dim, unsigned pos_dim,
-                         unsigned input_dim, unsigned layers);
+                         unsigned rel_dim, unsigned action_dim,
+                         unsigned pos_dim, unsigned input_dim, unsigned layers);
 
   static bool IsActionForbidden(const string& a, unsigned bsize, unsigned ssize,
                                 const vector<int>& stacki);
@@ -89,14 +88,22 @@ public:
                        const map<unsigned, std::string>& intToWords,
                        double *right);
 
-  void LoadPretrainedWords(const string& words_path, unsigned pretrained_dim) {
-    // TODO: make it load word vector dimension automatically
-    pretrained[kUNK] = vector<float>(pretrained_dim, 0);
-    cerr << "Loading from " << words_path << " with " << pretrained_dim
-         << " dimensions\n";
+  void LoadPretrainedWords(const string& words_path) {
+    cerr << "Loading word vectors from " << words_path;
     ifstream in(words_path);
+
+    // Read header
     string line;
     getline(in, line);
+    istringstream first_line(line);
+    unsigned num_words;
+    first_line >> num_words;
+    unsigned pretrained_dim;
+    first_line >> pretrained_dim;
+    cerr << " with " << pretrained_dim << " dimensions..." << endl;
+
+    // Read vectors
+    pretrained[kUNK] = vector<float>(pretrained_dim, 0);
     vector<float> v(pretrained_dim, 0);
     string word;
     while (getline(in, line)) {
@@ -106,7 +113,8 @@ public:
       unsigned id = corpus.get_or_add_word(word);
       pretrained[id] = v;
     }
-    cerr << "Loaded " << pretrained.size() << " words" << endl;
+    assert(num_words == pretrained.size() - 1); // -1 for UNK
+    cerr << "Loaded " << pretrained.size() - 1 << " words" << endl;
   }
 };
 

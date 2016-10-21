@@ -28,6 +28,7 @@ public:
   size_t n_possible_actions;
   const unsigned kUNK;
   const unsigned kROOT_SYMBOL;
+  cpyp::Corpus corpus;
 
   LSTMBuilder stack_lstm; // (layers, input, hidden, trainer)
   LSTMBuilder buffer_lstm;
@@ -55,8 +56,8 @@ public:
   Parameters* p_buffer_guard;  // end of buffer
   Parameters* p_stack_guard;  // end of stack
 
-  explicit ParserBuilder(Model* model, const string& pretrained_loc,
-                         cpyp::Corpus *corpus, bool use_pos,
+  explicit ParserBuilder(Model* model, const string& training_path,
+                         const string& pretrained_words_path, bool use_pos,
                          unsigned lstm_input_dim, unsigned hidden_dim,
                          unsigned pretrained_dim, unsigned rel_dim,
                          unsigned action_dim, unsigned pos_dim,
@@ -88,8 +89,7 @@ public:
                        const map<unsigned, std::string>& intToWords,
                        double *right);
 
-  void LoadPretrainedWords(cpyp::Corpus *corpus, const string& words_path,
-                           unsigned pretrained_dim) {
+  void LoadPretrainedWords(const string& words_path, unsigned pretrained_dim) {
     pretrained[kUNK] = vector<float>(pretrained_dim, 0);
     cerr << "Loading from " << words_path << " with " << pretrained_dim
          << " dimensions\n";
@@ -102,7 +102,7 @@ public:
       istringstream lin(line);
       lin >> word;
       for (unsigned i = 0; i < pretrained_dim; ++i) lin >> v[i];
-      unsigned id = corpus->get_or_add_word(word);
+      unsigned id = corpus.get_or_add_word(word);
       pretrained[id] = v;
     }
     cerr << "Loaded " << pretrained.size() << " words" << endl;

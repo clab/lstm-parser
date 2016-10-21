@@ -36,25 +36,26 @@ namespace po = boost::program_options;
 constexpr const char* ParserBuilder::ROOT_SYMBOL;
 
 
-ParserBuilder::ParserBuilder(Model* model, const string& pretrained_loc,
-                             cpyp::Corpus *corpus, bool use_pos_arg,
+ParserBuilder::ParserBuilder(Model* model, const string& training_path,
+                             const string& pretrained_words_path, bool use_pos,
                              unsigned lstm_input_dim, unsigned hidden_dim,
                              unsigned pretrained_dim, unsigned rel_dim,
                              unsigned action_dim, unsigned pos_dim,
                              unsigned input_dim, unsigned layers) :
-      kUNK(corpus->get_or_add_word(cpyp::Corpus::UNK)),
-      kROOT_SYMBOL(corpus->get_or_add_word(ROOT_SYMBOL)),
+      kUNK(corpus.get_or_add_word(cpyp::Corpus::UNK)),
+      kROOT_SYMBOL(corpus.get_or_add_word(ROOT_SYMBOL)),
       stack_lstm(layers, lstm_input_dim, hidden_dim, model),
       buffer_lstm(layers, lstm_input_dim, hidden_dim, model),
       action_lstm(layers, action_dim, hidden_dim, model) {
-  // First step is to load words if needed before creating network parameters.
+  corpus.load_correct_actions(training_path);
+  // First load words if needed before creating network parameters.
   // That will ensure that the corpus has the final number of words.
-  if (!pretrained_loc.empty()) {
-    LoadPretrainedWords(corpus, pretrained_loc, pretrained_dim);
+  if (!pretrained_words_path.empty()) {
+    LoadPretrainedWords(pretrained_words_path, pretrained_dim);
   }
-  vocab_size = corpus->nwords + 1; // set here so that it's available for p_t
+  vocab_size = corpus.nwords + 1; // set here so that it's available for p_t
 
-  if (!pretrained_loc.empty()) {
+  if (!pretrained_words_path.empty()) {
     p_t = model->add_lookup_parameters(vocab_size, {pretrained_dim});
     for (auto it : pretrained)
       p_t->Initialize(it.first, it.second);
@@ -65,12 +66,12 @@ ParserBuilder::ParserBuilder(Model* model, const string& pretrained_loc,
   }
 
   // Now that the corpus is finalized, we can set all the network parameters.
-  use_pos = use_pos_arg;
-  vocab_size = corpus->nwords + 1;
-  action_size = corpus->nactions + 1;
-  pos_size = corpus->npos + 10; // bad way of dealing with the fact that we
+  this->use_pos = use_pos;
+  vocab_size = corpus.nwords + 1;
+  action_size = corpus.nactions + 1;
+  pos_size = corpus.npos + 10; // bad way of dealing with the fact that we
                                 // may see new POS tags in the test set
-  n_possible_actions = corpus->nactions;
+  n_possible_actions = corpus.nactions;
 
   p_w = model->add_lookup_parameters(vocab_size, {input_dim});
   p_a = model->add_lookup_parameters(action_size, {action_dim});

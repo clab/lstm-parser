@@ -35,7 +35,6 @@ namespace po = boost::program_options;
 
 
 volatile bool requested_stop = false;
-cpyp::Corpus corpus; // TODO: make this non-global?
 
 
 void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
@@ -114,14 +113,14 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
                   const vector<string>& sentenceUnkStrings,
                   const map<unsigned, string>& intToWords,
                   const map<unsigned, string>& intToPos,
-                  const map<int,int>& hyp, const map<int,string>& rel_hyp) {
+                  const map<string, unsigned>& wordsToInt,
+                  const map<int, int>& hyp, const map<int, string>& rel_hyp) {
   for (unsigned i = 0; i < (sentence.size()-1); ++i) {
     auto index = i + 1;
+    const unsigned int unk_word = wordsToInt.find(cpyp::Corpus::UNK)->second;
     assert(i < sentenceUnkStrings.size() &&
-           ((sentence[i] == corpus.get_or_add_word(cpyp::Corpus::UNK) &&
-             sentenceUnkStrings[i].size() > 0) ||
-            (sentence[i] != corpus.get_or_add_word(cpyp::Corpus::UNK) &&
-             sentenceUnkStrings[i].size() == 0 &&
+           ((sentence[i] == unk_word && sentenceUnkStrings[i].size() > 0) ||
+            (sentence[i] != unk_word && sentenceUnkStrings[i].size() == 0 &&
              intToWords.find(sentence[i]) != intToWords.end())));
     string wit = (sentenceUnkStrings[i].size() > 0)?
       sentenceUnkStrings[i] : intToWords.find(sentence[i])->second;
@@ -151,7 +150,7 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 }
 
 
-void do_train(Model model, const unsigned unk_strategy,
+void do_train(Model *model, const unsigned unk_strategy,
               const set<unsigned>& singletons, const double unk_prob,
               const set<unsigned>& training_vocab, const string& fname,
               ParserBuilder* parser) {
@@ -159,8 +158,8 @@ void do_train(Model model, const unsigned unk_strategy,
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
   signal(SIGINT, signal_callback_handler);
-  SimpleSGDTrainer sgd(&model);
-  //MomentumSGDTrainer sgd(&model);
+  SimpleSGDTrainer sgd(model);
+  //MomentumSGDTrainer sgd(model);
   sgd.eta_decay = 0.08;
   //sgd.eta_decay = 0.05;
   vector<unsigned> order(corpus.nsentences);
@@ -258,7 +257,6 @@ void do_train(Model model, const unsigned unk_strategy,
             corpus.actions);
         map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
             corpus.actions);
-        //output_conll(sentence, corpus.intToWords, ref, hyp);
         correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
         total_heads += sentence.size() - 1;
       }
@@ -299,6 +297,7 @@ void do_test(const set<unsigned>& training_vocab, ParserBuilder* parser) {
   double correct_heads = 0;
   double total_heads = 0;
   auto t_start = std::chrono::high_resolution_clock::now();
+  const cpyp::Corpus& corpus = parser->corpus;
   unsigned corpus_size = corpus.nsentencesDev;
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
     const vector<unsigned>& sentence = corpus.sentencesDev[sii];
@@ -316,13 +315,14 @@ void do_test(const set<unsigned>& training_vocab, ParserBuilder* parser) {
         vector<unsigned>(), corpus.actions, corpus.intToWords, &right);
     llh -= lp;
     trs += actions.size();
-    map<int, string> rel_ref, rel_hyp;
+    map<int, string> rel_ref;
+    map<int, string> rel_hyp;
     map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
         corpus.actions, &rel_ref);
     map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
         corpus.actions, &rel_hyp);
     output_conll(sentence, sentencePos, sentenceUnkStr, corpus.intToWords,
-        corpus.intToPos, hyp, rel_hyp);
+        corpus.intToPos, corpus.wordsToInt, hyp, rel_hyp);
     correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
     total_heads += sentence.size() - 1;
   }
@@ -379,7 +379,16 @@ int main(int argc, char** argv) {
   const string fname = os.str();
   cerr << "Writing parameters to file: " << fname << endl;
 
-  corpus.load_correct_actions(conf["training_data"].as<string>());
+  Model model;
+  ParserBuilder parser(&model, conf["words"].as<string>(),
+                       conf["training_data"].as<string>(), use_pos,
+                       lstm_input_dim, hidden_dim, pretrained_dim, rel_dim,
+                       action_dim, pos_dim, input_dim, layers);
+  if (conf.count("model")) {
+    ifstream in(conf["model"].as<string>().c_str());
+    boost::archive::text_iarchive ia(in);
+    ia >> model;
+  }
 
   set<unsigned> training_vocab; // words available in the training corpus
   set<unsigned> singletons;
@@ -396,32 +405,24 @@ int main(int argc, char** argv) {
     }
   }
 
-  Model model;
-  ParserBuilder parser(&model, conf["words"].as<string>(), &corpus, use_pos,
-                       lstm_input_dim, hidden_dim, pretrained_dim, rel_dim,
-                       action_dim, pos_dim, input_dim, layers);
-  if (conf.count("model")) {
-    ifstream in(conf["model"].as<string>().c_str());
-    boost::archive::text_iarchive ia(in);
-    ia >> model;
-  }
-
-  cerr << "Total number of words: " << corpus.nwords << endl;
+  cerr << "Number of words: " << corpus.nwords << endl;
 
   // OOV words will be replaced by UNK tokens
   corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
-  //TRAINING
   if (train) {
-        do_train(model, unk_strategy, singletons, unk_prob, training_vocab,
+        do_train(&model, unk_strategy, singletons, unk_prob, training_vocab,
                  fname, &parser);
   }
   if (test) { // do test evaluation
     do_test(training_vocab, &parser);
   }
+
+  /*
   for (unsigned i = 0; i < corpus.actions.size(); ++i) {
-    //cerr << corpus.actions[i] << '\t' << parser.p_r->values[i].transpose()
-    //     << endl;
-    //cerr << corpus.actions[i] << '\t'
-    //     << parser.p_p2a->values.col(i).transpose() << endl;
+    cerr << corpus.actions[i] << '\t' << parser.p_r->values[i].transpose()
+         << endl;
+    cerr << corpus.actions[i] << '\t'
+         << parser.p_p2a->values.col(i).transpose() << endl;
   }
+  //*/
 }

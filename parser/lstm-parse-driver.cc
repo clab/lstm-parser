@@ -35,30 +35,40 @@ namespace po = boost::program_options;
 
 
 volatile bool requested_stop = false;
-constexpr const char* ROOT_SYMBOL = "ROOT";
-unsigned kROOT_SYMBOL = 0;
 cpyp::Corpus corpus; // TODO: make this non-global?
 
 
 void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   po::options_description opts("Configuration options");
   opts.add_options()
-        ("training_data,T", po::value<string>(), "List of Transitions - Training corpus")
+        ("training_data,T", po::value<string>(),
+         "List of Transitions - Training corpus")
         ("dev_data,d", po::value<string>(), "Development corpus")
         ("test_data,p", po::value<string>(), "Test corpus")
-        ("unk_strategy,o", po::value<unsigned>()->default_value(1), "Unknown word strategy: 1 = singletons become UNK with probability unk_prob")
-        ("unk_prob,u", po::value<double>()->default_value(0.2), "Probably with which to replace singletons with UNK in training data")
+        ("unk_strategy,o", po::value<unsigned>()->default_value(1),
+         "Unknown word strategy: 1 = singletons become UNK with probability"
+         " unk_prob")
+        ("unk_prob,u", po::value<double>()->default_value(0.2),
+         "Probably with which to replace singletons with UNK in training data")
         ("model,m", po::value<string>(), "Load saved model from this file")
         ("use_pos_tags,P", "make POS tags visible to parser")
-        ("layers", po::value<unsigned>()->default_value(2), "number of LSTM layers")
-        ("action_dim", po::value<unsigned>()->default_value(16), "action embedding size")
-        ("input_dim", po::value<unsigned>()->default_value(32), "input embedding size")
-        ("hidden_dim", po::value<unsigned>()->default_value(64), "hidden dimension")
-        ("pretrained_dim", po::value<unsigned>()->default_value(50), "pretrained input dimension")
+        ("layers,l", po::value<unsigned>()->default_value(2),
+         "number of LSTM layers")
+        ("action_dim", po::value<unsigned>()->default_value(16),
+         "action embedding size")
+        ("input_dim", po::value<unsigned>()->default_value(32),
+         "input embedding size")
+        ("hidden_dim", po::value<unsigned>()->default_value(64),
+         "hidden dimension")
+        ("pretrained_dim", po::value<unsigned>()->default_value(50),
+         "pretrained input dimension")
         ("pos_dim", po::value<unsigned>()->default_value(12), "POS dimension")
-        ("rel_dim", po::value<unsigned>()->default_value(10), "relation dimension")
-        ("lstm_input_dim", po::value<unsigned>()->default_value(60), "LSTM input dimension")
+        ("rel_dim", po::value<unsigned>()->default_value(10),
+         "relation dimension")
+        ("lstm_input_dim", po::value<unsigned>()->default_value(60),
+         "LSTM input dimension")
         ("train,t", "Should training be run?")
+        ("test,e", "Should the model be tested on dev data?")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
         ("help,h", "Help");
   po::options_description dcmdline_options;
@@ -69,7 +79,9 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
     exit(1);
   }
   if (conf->count("training_data") == 0) {
-    cerr << "Please specify --training_data (-T): this is required to determine the vocabulary mapping, even if the parser is used in prediction mode.\n";
+    cerr << "Please specify --training_data (-T): this is required to determine"
+            " the vocabulary mapping, even if the parser is used in prediction"
+            " mode.\n";
     exit(1);
   }
 }
@@ -85,7 +97,8 @@ void signal_callback_handler(int /* signum */) {
 }
 
 
-unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp, unsigned len) {
+unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp,
+                         unsigned len) {
   unsigned res = 0;
   for (unsigned i = 0; i < len; ++i) {
     auto ri = ref.find(i);
@@ -121,7 +134,8 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
     auto hyp_rel = hyp_rel_it->second;
     size_t first_char_in_rel = hyp_rel.find('(') + 1;
     size_t last_char_in_rel = hyp_rel.rfind(')') - 1;
-    hyp_rel = hyp_rel.substr(first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
+    hyp_rel = hyp_rel.substr(first_char_in_rel,
+                             last_char_in_rel - first_char_in_rel + 1);
     cout << index << '\t'       // 1. ID
          << wit << '\t'         // 2. FORM
          << "_" << '\t'         // 3. LEMMA
@@ -137,11 +151,13 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 }
 
 
-void do_train(Model model, unsigned status_every_i_iterations,
-    const unsigned unk_strategy, const set<unsigned>& singletons,
-    const double unk_prob, const unsigned kUNK,
-    const set<unsigned>& training_vocab, int best_correct_heads,
-    const string& fname, bool softlinkCreated, ParserBuilder* parser) {
+void do_train(Model model, const unsigned unk_strategy,
+              const set<unsigned>& singletons, const double unk_prob,
+              const set<unsigned>& training_vocab, const string& fname,
+              ParserBuilder* parser) {
+  bool softlinkCreated = false;
+  int best_correct_heads = 0;
+  unsigned status_every_i_iterations = 100;
   signal(SIGINT, signal_callback_handler);
   SimpleSGDTrainer sgd(&model);
   //MomentumSGDTrainer sgd(&model);
@@ -182,7 +198,7 @@ void do_train(Model model, unsigned status_every_i_iterations,
       if (unk_strategy == 1) {
         for (auto& w : tsentence) {
           if (singletons.count(w) && cnn::rand01() < unk_prob) {
-            w = kUNK;
+            w = parser->kUNK;
           }
         }
       }
@@ -230,7 +246,7 @@ void do_train(Model model, unsigned status_every_i_iterations,
         vector<unsigned> tsentence = sentence;
         for (auto& w : tsentence)
           if (training_vocab.count(w) == 0)
-            w = kUNK;
+            w = parser->kUNK;
         ComputationGraph hg;
         vector<unsigned> pred = parser->log_prob_parser(&hg, sentence,
             tsentence, sentencePos, vector<unsigned>(), corpus.actions,
@@ -275,8 +291,7 @@ void do_train(Model model, unsigned status_every_i_iterations,
 }
 
 
-void do_test(const set<unsigned>& training_vocab, const unsigned kUNK,
-    ParserBuilder* parser) {
+void do_test(const set<unsigned>& training_vocab, ParserBuilder* parser) {
   // do test evaluation
   double llh = 0;
   double trs = 0;
@@ -293,7 +308,7 @@ void do_test(const set<unsigned>& training_vocab, const unsigned kUNK,
     vector<unsigned> tsentence = sentence;
     for (auto& w : tsentence)
       if (training_vocab.count(w) == 0)
-        w = kUNK;
+        w = parser->kUNK;
     ComputationGraph cg;
     double lp = 0;
     vector<unsigned> pred;
@@ -324,14 +339,13 @@ int main(int argc, char** argv) {
   cnn::Initialize(argc, argv);
 
   cerr << "COMMAND:";
-  for (unsigned i = 0; i < static_cast<unsigned>(argc); ++i) cerr << ' ' << argv[i];
+  for (unsigned i = 0; i < static_cast<unsigned>(argc); ++i)
+    cerr << ' ' << argv[i];
   cerr << endl;
-  unsigned status_every_i_iterations = 100;
 
   po::variables_map conf;
   InitCommandLine(argc, argv, &conf);
-  bool use_pos = conf.count("use_pos_tags");
-
+  const bool use_pos = conf.count("use_pos_tags");
   const unsigned layers = conf["layers"].as<unsigned>();
   const unsigned input_dim = conf["input_dim"].as<unsigned>();
   const unsigned pretrained_dim = conf["pretrained_dim"].as<unsigned>();
@@ -359,13 +373,10 @@ int main(int argc, char** argv) {
      << '_' << pos_dim
      << '_' << rel_dim
      << "-pid" << getpid() << ".params";
-  int best_correct_heads = 0;
   const string fname = os.str();
   cerr << "Writing parameters to file: " << fname << endl;
-  bool softlinkCreated = false;
+
   corpus.load_correct_actions(conf["training_data"].as<string>());
-  const unsigned kUNK = corpus.get_or_add_word(cpyp::Corpus::UNK);
-  kROOT_SYMBOL = corpus.get_or_add_word(ROOT_SYMBOL);
 
   set<unsigned> training_vocab; // words available in the training corpus
   set<unsigned> singletons;
@@ -396,15 +407,16 @@ int main(int argc, char** argv) {
   corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
   //TRAINING
   if (conf.count("train")) {
-        do_train(model, status_every_i_iterations, unk_strategy, singletons,
-                unk_prob, kUNK, training_vocab, best_correct_heads, fname,
-                softlinkCreated, &parser);
-  } // should do training?
-  if (true) { // do test evaluation
-    do_test(training_vocab, kUNK, &parser);
+        do_train(model, unk_strategy, singletons, unk_prob, training_vocab,
+                 fname, &parser);
+  }
+  if (conf.count("test")) { // do test evaluation
+    do_test(training_vocab, &parser);
   }
   for (unsigned i = 0; i < corpus.actions.size(); ++i) {
-    //cerr << corpus.actions[i] << '\t' << parser.p_r->values[i].transpose() << endl;
-    //cerr << corpus.actions[i] << '\t' << parser.p_p2a->values.col(i).transpose() << endl;
+    //cerr << corpus.actions[i] << '\t' << parser.p_r->values[i].transpose()
+    //     << endl;
+    //cerr << corpus.actions[i] << '\t'
+    //     << parser.p_p2a->values.col(i).transpose() << endl;
   }
 }

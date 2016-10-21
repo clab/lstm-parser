@@ -17,12 +17,16 @@ using namespace std;
 
 
 struct ParserBuilder {
+  static constexpr const char* ROOT_SYMBOL = "ROOT";
+
   bool use_pos;
   unsigned vocab_size;
   unsigned action_size;
   unsigned pos_size;
   unordered_map<unsigned, vector<float>> pretrained;
   size_t n_possible_actions;
+  const unsigned kUNK;
+  const unsigned kROOT_SYMBOL;
 
   LSTMBuilder stack_lstm; // (layers, input, hidden, trainer)
   LSTMBuilder buffer_lstm;
@@ -85,7 +89,6 @@ struct ParserBuilder {
 
   void LoadPretrainedWords(cpyp::Corpus *corpus, const string& words_path,
                            unsigned pretrained_dim) {
-    const unsigned kUNK = corpus->get_or_add_word(cpyp::Corpus::UNK);
     pretrained[kUNK] = vector<float>(pretrained_dim, 0);
     cerr << "Loading from " << words_path << " with " << pretrained_dim
          << " dimensions\n";

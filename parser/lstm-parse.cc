@@ -33,17 +33,22 @@ using namespace std;
 namespace po = boost::program_options;
 
 
+constexpr const char* ParserBuilder::ROOT_SYMBOL;
+
+
 ParserBuilder::ParserBuilder(Model* model, const string& pretrained_loc,
                              cpyp::Corpus *corpus, bool use_pos_arg,
                              unsigned lstm_input_dim, unsigned hidden_dim,
                              unsigned pretrained_dim, unsigned rel_dim,
                              unsigned action_dim, unsigned pos_dim,
                              unsigned input_dim, unsigned layers) :
+      kUNK(corpus->get_or_add_word(cpyp::Corpus::UNK)),
+      kROOT_SYMBOL(corpus->get_or_add_word(ROOT_SYMBOL)),
       stack_lstm(layers, lstm_input_dim, hidden_dim, model),
       buffer_lstm(layers, lstm_input_dim, hidden_dim, model),
       action_lstm(layers, action_dim, hidden_dim, model) {
-  // First step is to load words if needed. That will ensure that the corpus has
-  // the final number of words.
+  // First step is to load words if needed before creating network parameters.
+  // That will ensure that the corpus has the final number of words.
   if (!pretrained_loc.empty()) {
     LoadPretrainedWords(corpus, pretrained_loc, pretrained_dim);
   }

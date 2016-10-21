@@ -278,7 +278,7 @@ void do_train(Model *model, const unsigned unk_strategy,
         best_correct_heads = correct_heads;
         ofstream out(fname);
         boost::archive::text_oarchive oa(out);
-        oa << model;
+        oa << *model;
         // Create a soft link to the most recent model in order to make it
         // easier to refer to it in a shell script.
         if (!softlinkCreated) {

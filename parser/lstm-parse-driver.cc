@@ -147,10 +147,9 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 }
 
 
-void do_train(Model *model, const unsigned unk_strategy,
+void do_train(ParserBuilder* parser, Model *model, const unsigned unk_strategy,
               const set<unsigned>& singletons, const double unk_prob,
-              const set<unsigned>& training_vocab, const string& fname,
-              ParserBuilder* parser) {
+              const set<unsigned>& training_vocab, const string& fname) {
   bool softlinkCreated = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
@@ -293,7 +292,7 @@ void do_train(Model *model, const unsigned unk_strategy,
 }
 
 
-void do_test(const set<unsigned>& training_vocab, ParserBuilder* parser) {
+void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab) {
   // do test evaluation
   double llh = 0;
   double trs = 0;
@@ -416,11 +415,11 @@ int main(int argc, char** argv) {
        << "-pid" << getpid() << ".params";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    do_train(&model, unk_strategy, singletons, unk_prob, training_vocab,
-                 fname, &parser);
+    do_train(&parser, &model, unk_strategy, singletons, unk_prob, training_vocab,
+             fname);
   }
   if (test) { // do test evaluation
-    do_test(training_vocab, &parser);
+    do_test(&parser, training_vocab);
   }
 
   /*

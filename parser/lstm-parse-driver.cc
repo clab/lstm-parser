@@ -352,14 +352,19 @@ int main(int argc, char** argv) {
 
   po::variables_map conf;
   InitCommandLine(argc, argv, &conf);
-  const bool use_pos = conf.count("use_pos_tags");
-  const unsigned layers = conf["layers"].as<unsigned>();
-  const unsigned input_dim = conf["input_dim"].as<unsigned>();
-  const unsigned hidden_dim = conf["hidden_dim"].as<unsigned>();
-  const unsigned action_dim = conf["action_dim"].as<unsigned>();
-  const unsigned lstm_input_dim = conf["lstm_input_dim"].as<unsigned>();
-  const unsigned pos_dim = conf["pos_dim"].as<unsigned>();
-  const unsigned rel_dim = conf["rel_dim"].as<unsigned>();
+
+  ParserOptions options {
+    conf.count("use_pos_tags"),
+    conf["layers"].as<unsigned>(),
+    conf["input_dim"].as<unsigned>(),
+    conf["hidden_dim"].as<unsigned>(),
+    conf["action_dim"].as<unsigned>(),
+    conf["lstm_input_dim"].as<unsigned>(),
+    conf["pos_dim"].as<unsigned>(),
+    conf["rel_dim"].as<unsigned>()
+  };
+
+  // Training options and operation options
   const unsigned unk_strategy = conf["unk_strategy"].as<unsigned>();
   const double unk_prob = conf["unk_prob"].as<double>();
   const bool train = conf.count("train");
@@ -375,9 +380,7 @@ int main(int argc, char** argv) {
 
   Model model;
   ParserBuilder parser(&model, conf["training_data"].as<string>(),
-                       conf["words"].as<string>(), use_pos, lstm_input_dim,
-                       hidden_dim, rel_dim, action_dim, pos_dim, input_dim,
-                       layers);
+                       conf["words"].as<string>(), options);
   if (conf.count("model")) {
     ifstream in(conf["model"].as<string>().c_str());
     boost::archive::text_iarchive ia(in);
@@ -405,14 +408,14 @@ int main(int argc, char** argv) {
   parser.corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
   if (train) {
     ostringstream os;
-    os << "parser_" << (use_pos ? "pos" : "nopos")
-       << '_' << layers
-       << '_' << input_dim
-       << '_' << hidden_dim
-       << '_' << action_dim
-       << '_' << lstm_input_dim
-       << '_' << pos_dim
-       << '_' << rel_dim
+    os << "parser_" << (options.use_pos ? "pos" : "nopos")
+       << '_' << options.layers
+       << '_' << options.input_dim
+       << '_' << options.hidden_dim
+       << '_' << options.action_dim
+       << '_' << options.lstm_input_dim
+       << '_' << options.pos_dim
+       << '_' << options.rel_dim
        << "-pid" << getpid() << ".params";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;

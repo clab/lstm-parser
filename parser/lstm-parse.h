@@ -13,12 +13,37 @@
 #include "c2.h"
 
 
+struct ParserOptions {
+  const bool use_pos;
+  const unsigned layers;
+  const unsigned input_dim;
+  const unsigned hidden_dim;
+  const unsigned action_dim;
+  const unsigned lstm_input_dim;
+  const unsigned pos_dim;
+  const unsigned rel_dim;
+
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+    ar & use_pos;
+    ar & layers;
+    ar & input_dim;
+    ar & hidden_dim;
+    ar & action_dim;
+    ar & lstm_input_dim;
+    ar & pos_dim;
+    ar & rel_dim;
+  }
+};
+
+
 class ParserBuilder {
 public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
+  ParserOptions options;
   cpyp::Corpus corpus;
-  bool use_pos;
+
   unsigned vocab_size;
   unsigned action_size;
   unsigned pos_size;
@@ -54,10 +79,8 @@ public:
   cnn::Parameters* p_stack_guard;  // end of stack
 
   explicit ParserBuilder(cnn::Model* model, const std::string& training_path,
-                         const std::string& pretrained_words_path, bool use_pos,
-                         unsigned lstm_input_dim, unsigned hidden_dim,
-                         unsigned rel_dim, unsigned action_dim,
-                         unsigned pos_dim, unsigned input_dim, unsigned layers);
+                         const std::string& pretrained_words_path,
+                         const ParserOptions& options);
 
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);

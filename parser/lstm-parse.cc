@@ -37,17 +37,18 @@ constexpr const char* ParserBuilder::ROOT_SYMBOL;
 
 
 ParserBuilder::ParserBuilder(Model* model, const string& training_path,
-                             const string& pretrained_words_path, bool use_pos,
-                             unsigned lstm_input_dim, unsigned hidden_dim,
-                             unsigned rel_dim, unsigned action_dim,
-                             unsigned pos_dim, unsigned input_dim,
-                             unsigned layers) :
+                             const string& pretrained_words_path,
+                             const ParserOptions& options) :
+      options(options),
       corpus(training_path),
       kUNK(corpus.get_or_add_word(cpyp::Corpus::UNK)),
       kROOT_SYMBOL(corpus.get_or_add_word(ROOT_SYMBOL)),
-      stack_lstm(layers, lstm_input_dim, hidden_dim, model),
-      buffer_lstm(layers, lstm_input_dim, hidden_dim, model),
-      action_lstm(layers, action_dim, hidden_dim, model) {
+      stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
+                 model),
+      buffer_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
+                  model),
+      action_lstm(options.layers, options.action_dim, options.hidden_dim,
+                  model) {
   // First load words if needed before creating network parameters.
   // That will ensure that the corpus has the final number of words.
   if (!pretrained_words_path.empty()) {
@@ -60,42 +61,41 @@ ParserBuilder::ParserBuilder(Model* model, const string& training_path,
     p_t = model->add_lookup_parameters(vocab_size, {pretrained_dim});
     for (auto it : pretrained)
       p_t->Initialize(it.first, it.second);
-    p_t2l = model->add_parameters({lstm_input_dim, pretrained_dim});
+    p_t2l = model->add_parameters({options.lstm_input_dim, pretrained_dim});
   } else {
     p_t = nullptr;
     p_t2l = nullptr;
   }
 
   // Now that the corpus is finalized, we can set all the network parameters.
-  this->use_pos = use_pos;
   vocab_size = corpus.nwords + 1;
   action_size = corpus.nactions + 1;
   pos_size = corpus.npos + 10; // bad way of dealing with the fact that we
                                 // may see new POS tags in the test set
   n_possible_actions = corpus.nactions;
 
-  p_w = model->add_lookup_parameters(vocab_size, {input_dim});
-  p_a = model->add_lookup_parameters(action_size, {action_dim});
-  p_r = model->add_lookup_parameters(action_size, {rel_dim});
-  p_pbias = model->add_parameters({hidden_dim});
-  p_A = model->add_parameters({hidden_dim, hidden_dim});
-  p_B = model->add_parameters({hidden_dim, hidden_dim});
-  p_S = model->add_parameters({hidden_dim, hidden_dim});
-  p_H = model->add_parameters({lstm_input_dim, lstm_input_dim});
-  p_D = model->add_parameters({lstm_input_dim, lstm_input_dim});
-  p_R = model->add_parameters({lstm_input_dim, rel_dim});
-  p_w2l = model->add_parameters({lstm_input_dim, input_dim});
-  p_ib = model->add_parameters({lstm_input_dim});
-  p_cbias = model->add_parameters({lstm_input_dim});
-  p_p2a = model->add_parameters({action_size, hidden_dim});
-  p_action_start = model->add_parameters({action_dim});
+  p_w = model->add_lookup_parameters(vocab_size, {options.input_dim});
+  p_a = model->add_lookup_parameters(action_size, {options.action_dim});
+  p_r = model->add_lookup_parameters(action_size, {options.rel_dim});
+  p_pbias = model->add_parameters({options.hidden_dim});
+  p_A = model->add_parameters({options.hidden_dim, options.hidden_dim});
+  p_B = model->add_parameters({options.hidden_dim, options.hidden_dim});
+  p_S = model->add_parameters({options.hidden_dim, options.hidden_dim});
+  p_H = model->add_parameters({options.lstm_input_dim, options.lstm_input_dim});
+  p_D = model->add_parameters({options.lstm_input_dim, options.lstm_input_dim});
+  p_R = model->add_parameters({options.lstm_input_dim, options.rel_dim});
+  p_w2l = model->add_parameters({options.lstm_input_dim, options.input_dim});
+  p_ib = model->add_parameters({options.lstm_input_dim});
+  p_cbias = model->add_parameters({options.lstm_input_dim});
+  p_p2a = model->add_parameters({action_size, options.hidden_dim});
+  p_action_start = model->add_parameters({options.action_dim});
   p_abias = model->add_parameters({action_size});
-  p_buffer_guard = model->add_parameters({lstm_input_dim});
-  p_stack_guard = model->add_parameters({lstm_input_dim});
+  p_buffer_guard = model->add_parameters({options.lstm_input_dim});
+  p_stack_guard = model->add_parameters({options.lstm_input_dim});
 
-  if (use_pos) {
-    p_p = model->add_lookup_parameters(pos_size, {pos_dim});
-    p_p2l = model->add_parameters({lstm_input_dim, pos_dim});
+  if (options.use_pos) {
+    p_p = model->add_lookup_parameters(pos_size, {options.pos_dim});
+    p_p2l = model->add_parameters({options.lstm_input_dim, options.pos_dim});
   }
 }
 
@@ -199,7 +199,7 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
   Expression ib = parameter(*hg, p_ib);
   Expression w2l = parameter(*hg, p_w2l);
   Expression p2l;
-  if (use_pos)
+  if (options.use_pos)
     p2l = parameter(*hg, p_p2l);
   Expression t2l;
   if (p_t2l)
@@ -219,7 +219,7 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
     Expression w =lookup(*hg, p_w, sent[i]);
 
     vector<Expression> args = {ib, w2l, w}; // learn embeddings
-    if (use_pos) { // learn POS tag?
+    if (options.use_pos) { // learn POS tag?
       Expression p = lookup(*hg, p_p, sentPos[i]);
       args.push_back(p2l);
       args.push_back(p);

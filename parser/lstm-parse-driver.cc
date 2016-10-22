@@ -149,14 +149,14 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 }
 
 
-void do_train(ParserBuilder* parser, Model *model, const unsigned unk_strategy,
+void do_train(ParserBuilder* parser, const unsigned unk_strategy,
               const set<unsigned>& singletons, const double unk_prob,
               const set<unsigned>& training_vocab, const string& fname) {
   bool softlinkCreated = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
   signal(SIGINT, signal_callback_handler);
-  SimpleSGDTrainer sgd(model);
+  SimpleSGDTrainer sgd(&parser->model);
   //MomentumSGDTrainer sgd(model);
   sgd.eta_decay = 0.08;
   //sgd.eta_decay = 0.05;
@@ -277,7 +277,7 @@ void do_train(ParserBuilder* parser, Model *model, const unsigned unk_strategy,
         ofstream out(fname);
         boost::archive::text_oarchive oa(out);
         oa << parser->options;
-        oa << *model;
+        oa << parser->model;
         // Create a soft link to the most recent model in order to make it
         // easier to refer to it in a shell script.
         if (!softlinkCreated) {
@@ -400,11 +400,10 @@ int main(int argc, char** argv) {
     }
   }
 
-  Model model;
-  ParserBuilder parser(&model, conf["training_data"].as<string>(),
+  ParserBuilder parser(conf["training_data"].as<string>(),
                        conf["words"].as<string>(), options);
   if (load_model) {
-    *archive_ptr >> model;
+    *archive_ptr >> parser.model;
   }
 
   set<unsigned> training_vocab; // words available in the training corpus
@@ -439,8 +438,8 @@ int main(int argc, char** argv) {
        << "-pid" << getpid() << ".params";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    do_train(&parser, &model, unk_strategy, singletons, unk_prob,
-             training_vocab, fname);
+    do_train(&parser, unk_strategy, singletons, unk_prob, training_vocab,
+             fname);
   }
   if (test) { // do test evaluation
     do_test(&parser, training_vocab);

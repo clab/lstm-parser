@@ -54,6 +54,7 @@ public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
   const ParserOptions options;
+  cnn::Model model;
   cpyp::Corpus corpus;
 
   unsigned vocab_size;
@@ -90,7 +91,7 @@ public:
   cnn::Parameters* p_buffer_guard;  // end of buffer
   cnn::Parameters* p_stack_guard;  // end of stack
 
-  explicit ParserBuilder(cnn::Model* model, const std::string& training_path,
+  explicit ParserBuilder(const std::string& training_path,
                          const std::string& pretrained_words_path,
                          const ParserOptions& options);
 

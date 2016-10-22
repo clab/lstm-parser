@@ -7,6 +7,8 @@
 #include <cmath>
 #include <chrono>
 #include <ctime>
+#include <memory>
+#include <utility>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -274,6 +276,7 @@ void do_train(ParserBuilder* parser, Model *model, const unsigned unk_strategy,
         best_correct_heads = correct_heads;
         ofstream out(fname);
         boost::archive::text_oarchive oa(out);
+        oa << parser->options;
         oa << *model;
         // Create a soft link to the most recent model in order to make it
         // easier to refer to it in a shell script.
@@ -353,6 +356,10 @@ int main(int argc, char** argv) {
   po::variables_map conf;
   InitCommandLine(argc, argv, &conf);
 
+  bool load_model = conf.count("model");
+  unique_ptr<boost::archive::text_iarchive> archive_ptr;
+  unique_ptr<ifstream> model_stream_ptr;
+
   ParserOptions options {
     conf.count("use_pos_tags"),
     conf["layers"].as<unsigned>(),
@@ -376,15 +383,28 @@ int main(int argc, char** argv) {
   } else {
     abort();
   }
-  assert(unk_prob >= 0.); assert(unk_prob <= 1.);
+  assert(unk_prob >= 0. && unk_prob <= 1.);
+
+  if (load_model) {
+    const string& model_path = conf["model"].as<string>();
+    cerr << "Loading model from " << model_path << endl;
+    model_stream_ptr.reset(new ifstream(model_path.c_str()));
+    archive_ptr.reset(new boost::archive::text_iarchive(*model_stream_ptr));
+
+    ParserOptions stored_options {};
+    *archive_ptr >> stored_options;
+    if (stored_options != options) {
+      cerr << "WARNING: overriding command line network options with stored"
+              " options" << endl;
+      options = stored_options;
+    }
+  }
 
   Model model;
   ParserBuilder parser(&model, conf["training_data"].as<string>(),
                        conf["words"].as<string>(), options);
-  if (conf.count("model")) {
-    ifstream in(conf["model"].as<string>().c_str());
-    boost::archive::text_iarchive ia(in);
-    ia >> model;
+  if (load_model) {
+    *archive_ptr >> model;
   }
 
   set<unsigned> training_vocab; // words available in the training corpus

@@ -14,14 +14,14 @@
 
 
 struct ParserOptions {
-  const bool use_pos;
-  const unsigned layers;
-  const unsigned input_dim;
-  const unsigned hidden_dim;
-  const unsigned action_dim;
-  const unsigned lstm_input_dim;
-  const unsigned pos_dim;
-  const unsigned rel_dim;
+  bool use_pos;
+  unsigned layers;
+  unsigned input_dim;
+  unsigned hidden_dim;
+  unsigned action_dim;
+  unsigned lstm_input_dim;
+  unsigned pos_dim;
+  unsigned rel_dim;
 
   template<class Archive>
   void serialize(Archive & ar, const unsigned int version) {
@@ -34,6 +34,18 @@ struct ParserOptions {
     ar & pos_dim;
     ar & rel_dim;
   }
+
+  inline bool operator==(const ParserOptions& other) {
+    return use_pos == other.use_pos && layers == other.layers
+        && input_dim == other.input_dim && hidden_dim == other.hidden_dim
+        && action_dim == other.action_dim
+        && lstm_input_dim == other.lstm_input_dim && pos_dim == other.pos_dim
+        && rel_dim == other.rel_dim;
+  }
+
+  inline bool operator!=(const ParserOptions& other) {
+    return !operator==(other);
+  }
 };
 
 
@@ -41,7 +53,7 @@ class ParserBuilder {
 public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
-  ParserOptions options;
+  const ParserOptions options;
   cpyp::Corpus corpus;
 
   unsigned vocab_size;

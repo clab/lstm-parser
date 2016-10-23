@@ -40,8 +40,8 @@ ParserBuilder::ParserBuilder(const string& training_path,
                              const string& pretrained_words_path,
                              const ParserOptions& options) :
       options(options),
-      corpus(training_path),
-      kUNK(corpus.get_or_add_word(cpyp::Corpus::UNK)),
+      corpus(training_path, &vocab),
+      kUNK(corpus.get_or_add_word(vocab.UNK)),
       kROOT_SYMBOL(corpus.get_or_add_word(ROOT_SYMBOL)),
       stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
                  &model),
@@ -56,11 +56,11 @@ ParserBuilder::ParserBuilder(const string& training_path,
   }
 
   // Now that the corpus is finalized, we can set all the network parameters.
-  action_size = corpus.nactions + 1;
-  pos_size = corpus.npos + 10; // bad way of dealing with the fact that we
-                               // may see new POS tags in the test set
-  n_possible_actions = corpus.nactions;
-  vocab_size = corpus.nwords + 1; // needs to be set for p_t
+  action_size = vocab.CountActions() + 1;
+  pos_size = vocab.CountPOS() + 10; // bad way of dealing with the fact that we
+                                    // may see new POS tags in the test set
+  n_possible_actions = vocab.CountActions();
+  vocab_size = vocab.CountWords() + 1; // needs to be set for p_t
 
   if (!pretrained_words_path.empty()) {
     unsigned pretrained_dim = pretrained.begin()->second.size();
@@ -175,7 +175,7 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
                    const vector<unsigned>& sentPos,
                    const vector<unsigned>& correct_actions,
                    const vector<string>& setOfActions,
-                   const map<unsigned, std::string>& intToWords,
+                   const vector<std::string>& intToWords,
                    double *right) {
   vector<unsigned> results;
   const bool build_training_graph = correct_actions.size() > 0;
@@ -345,7 +345,7 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
       (ac == 'R' ? headi : depi) = stacki.back();
       stack.pop_back();
       stacki.pop_back();
-      if (headi == sent.size() - 1) rootword = intToWords.find(sent[depi])->second;
+      if (headi == sent.size() - 1) rootword = intToWords[sent[depi]];
       // composed = cbias + H * head + D * dep + R * relation
       Expression composed = affine_transform({cbias, H, head, D, dep, R, relation});
       Expression nlcomposed = tanh(composed);

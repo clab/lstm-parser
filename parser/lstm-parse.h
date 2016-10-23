@@ -55,6 +55,7 @@ public:
 
   const ParserOptions options;
   cnn::Model model;
+  cpyp::ParserVocabulary vocab;
   cpyp::Corpus corpus;
 
   unsigned vocab_size;
@@ -118,7 +119,7 @@ public:
                        const std::vector<unsigned>& sentPos,
                        const std::vector<unsigned>& correct_actions,
                        const std::vector<std::string>& setOfActions,
-                       const std::map<unsigned, std::string>& intToWords,
+                       const std::vector<std::string>& intToWords,
                        double *right);
 
   void LoadPretrainedWords(const std::string& words_path) {
@@ -136,7 +137,8 @@ public:
     std::cerr << " with " << pretrained_dim << " dimensions..." << std::endl;
 
     // Read std::vectors
-    pretrained[kUNK] = std::vector<float>(pretrained_dim, 0);
+    pretrained[vocab.wordsToInt[vocab.UNK]] = std::vector<float>(pretrained_dim,
+                                                                 0);
     std::vector<float> v(pretrained_dim, 0);
     std::string word;
     while (getline(in, line)) {

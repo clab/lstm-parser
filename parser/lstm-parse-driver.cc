@@ -110,20 +110,21 @@ unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp,
 
 void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
                   const vector<string>& sentenceUnkStrings,
-                  const map<unsigned, string>& intToWords,
-                  const map<unsigned, string>& intToPos,
+                  const vector<string>& intToWords,
+                  const vector<string>& intToPos,
                   const map<string, unsigned>& wordsToInt,
                   const map<int, int>& hyp, const map<int, string>& rel_hyp) {
   for (unsigned i = 0; i < (sentence.size()-1); ++i) {
     auto index = i + 1;
-    const unsigned int unk_word = wordsToInt.find(cpyp::Corpus::UNK)->second;
+    const unsigned int unk_word =
+        wordsToInt.find(cpyp::ParserVocabulary::UNK)->second;
     assert(i < sentenceUnkStrings.size() &&
            ((sentence[i] == unk_word && sentenceUnkStrings[i].size() > 0) ||
             (sentence[i] != unk_word && sentenceUnkStrings[i].size() == 0 &&
-             intToWords.find(sentence[i]) != intToWords.end())));
-    string wit = (sentenceUnkStrings[i].size() > 0)?
-      sentenceUnkStrings[i] : intToWords.find(sentence[i])->second;
-    auto pit = intToPos.find(pos[i]);
+             intToWords.size() > sentence[i])));
+    string wit = (sentenceUnkStrings[i].size() > 0) ?
+      sentenceUnkStrings[i] : intToWords[sentence[i]];
+    const string& pos_tag = intToPos[pos[i]];
     assert(hyp.find(i) != hyp.end());
     auto hyp_head = hyp.find(i)->second + 1;
     if (hyp_head == (int)sentence.size()) hyp_head = 0;
@@ -138,7 +139,7 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
          << wit << '\t'         // 2. FORM
          << "_" << '\t'         // 3. LEMMA
          << "_" << '\t'         // 4. CPOSTAG
-         << pit->second << '\t' // 5. POSTAG
+         << pos_tag << '\t'     // 5. POSTAG
          << "_" << '\t'         // 6. FEATS
          << hyp_head << '\t'    // 7. HEAD
          << hyp_rel << '\t'     // 8. DEPREL
@@ -207,7 +208,7 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
           corpus.correct_act_sent.find(order[si])->second;
       ComputationGraph hg;
       parser->LogProbParser(&hg, sentence, tsentence, sentencePos, actions,
-          corpus.actions, corpus.intToWords, &right);
+          corpus.vocab->actions, corpus.vocab->intToWords, &right);
       double lp = as_scalar(hg.incremental_forward());
       if (lp < 0) {
         cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp
@@ -253,15 +254,15 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
             w = parser->kUNK;
         ComputationGraph hg;
         vector<unsigned> pred = parser->LogProbParser(&hg, sentence,
-            tsentence, sentencePos, vector<unsigned>(), corpus.actions,
-            corpus.intToWords, &right);
+            tsentence, sentencePos, vector<unsigned>(), corpus.vocab->actions,
+            corpus.vocab->intToWords, &right);
         double lp = 0;
         llh -= lp;
         trs += actions.size();
         map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
-            corpus.actions);
+            corpus.vocab->actions);
         map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
-            corpus.actions);
+            corpus.vocab->actions);
         correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
         total_heads += sentence.size() - 1;
       }
@@ -322,17 +323,19 @@ void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab) {
     double lp = 0;
     vector<unsigned> pred;
     pred = parser->LogProbParser(&cg, sentence, tsentence, sentencePos,
-        vector<unsigned>(), corpus.actions, corpus.intToWords, &right);
+                                 vector<unsigned>(), corpus.vocab->actions,
+                                 corpus.vocab->intToWords, &right);
     llh -= lp;
     trs += actions.size();
     map<int, string> rel_ref;
     map<int, string> rel_hyp;
     map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
-        corpus.actions, &rel_ref);
+        corpus.vocab->actions, &rel_ref);
     map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
-        corpus.actions, &rel_hyp);
-    output_conll(sentence, sentencePos, sentenceUnkStr, corpus.intToWords,
-        corpus.intToPos, corpus.wordsToInt, hyp, rel_hyp);
+        corpus.vocab->actions, &rel_hyp);
+    output_conll(sentence, sentencePos, sentenceUnkStr,
+                 corpus.vocab->intToWords, corpus.vocab->intToPos,
+                 corpus.vocab->wordsToInt, hyp, rel_hyp);
     correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
     total_heads += sentence.size() - 1;
   }
@@ -421,7 +424,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  cerr << "Total number of words: " << parser.corpus.nwords << endl;
+  cerr << "Total number of words: " << parser.corpus.vocab->CountWords()
+       << endl;
 
   // OOV words will be replaced by UNK tokens
   parser.corpus.load_correct_actionsDev(conf["dev_data"].as<string>());

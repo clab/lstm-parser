@@ -16,6 +16,60 @@
 
 namespace cpyp {
 
+class ParserVocabulary {
+  friend class Corpus;
+public:
+  typedef std::map<std::string, unsigned> StrToIntMap;
+
+  // String literals
+  static constexpr const char* UNK = "<UNK>";
+  static constexpr const char* BAD0 = "<BAD0>";
+
+  StrToIntMap wordsToInt;
+  std::vector<std::string> intToWords;
+
+  StrToIntMap posToInt;
+  std::vector<std::string> intToPos;
+
+  StrToIntMap charsToInt;
+  std::vector<std::string> intToChars;
+
+  std::vector<std::string> actions;
+
+  ParserVocabulary() {
+    AddEntry(BAD0, &wordsToInt, &intToWords);
+    AddEntry(UNK, &wordsToInt, &intToWords);
+    AddEntry("", &posToInt, &intToPos);
+    AddEntry("", &charsToInt, &intToChars);
+    AddEntry(BAD0, &charsToInt, &intToChars);
+  }
+
+  inline unsigned CountPOS() { return posToInt.size(); }
+  inline unsigned CountWords() { return wordsToInt.size(); }
+  inline unsigned CountChars() { return charsToInt.size(); }
+  inline unsigned CountActions() { return actions.size(); }
+
+private:
+  static inline int AddEntry(const std::string& str, StrToIntMap* map,
+                              std::vector<std::string>* indexed_list) {
+    int new_id = indexed_list->size();
+    map->insert({str, new_id});
+    indexed_list->push_back(str);
+    return new_id;
+  }
+
+  static inline unsigned GetOrAddEntry(const std::string& str, StrToIntMap* map,
+                                       std::vector<std::string>* indexed_list) {
+    auto entry_iter = map->find(str);
+    if (entry_iter == map->end()) {
+      return AddEntry(str, map, indexed_list);
+    } else {
+      return entry_iter->second;
+    }
+  }
+};
+
+
 class Corpus {
  //typedef std::unordered_map<std::string, unsigned, std::hash<std::string> > Map;
 // typedef std::unordered_map<unsigned,std::string, std::hash<std::string> > ReverseMap;
@@ -33,29 +87,9 @@ public:
    unsigned nsentencesDev;
 
    unsigned nsentences;
-   unsigned nwords;
-   unsigned nactions;
-   unsigned npos;
 
    unsigned nsentencestest;
    unsigned nsentencesdev;
-   int max;
-   int maxPos;
-
-   std::map<std::string, unsigned> wordsToInt;
-   std::map<unsigned, std::string> intToWords;
-   std::vector<std::string> actions;
-
-   std::map<std::string, unsigned> posToInt;
-   std::map<unsigned, std::string> intToPos;
-
-   int maxChars;
-   std::map<std::string, unsigned> charsToInt;
-   std::map<unsigned, std::string> intToChars;
-
-   // String literals
-   static constexpr const char* UNK = "UNK";
-   static constexpr const char* BAD0 = "<BAD0>";
 
 /*  std::map<unsigned,unsigned>* headsTraining;
   std::map<unsigned,std::string>* labelsTraining;
@@ -63,22 +97,11 @@ public:
   std::map<unsigned,unsigned>*  headsParsing;
   std::map<unsigned,std::string>* labelsParsing;*/
 
+   ParserVocabulary *vocab;
+
 
 public:
-  Corpus(const std::string &file) {
-    wordsToInt[Corpus::BAD0] = 0;
-    intToWords[0] = Corpus::BAD0;
-    wordsToInt[Corpus::UNK] = 1; // unknown symbol
-    intToWords[1] = Corpus::UNK;
-    max=2;
-    maxPos=1;
-
-    charsToInt[BAD0]=1;
-    intToChars[1]="BAD0";
-    maxChars=1;
-
-    npos = 0;
-
+  Corpus(const std::string &file, ParserVocabulary *vocab) : vocab(vocab) {
     load_correct_actions(file);
   }
 
@@ -148,43 +171,31 @@ public:
             // split the string (at '-') into word and POS tag.
             size_t posIndex = word.rfind('-');
             if (posIndex == std::string::npos) {
-              std::cerr << "cant find the dash in '" << word << "'" << std::endl;
+              std::cerr << "cant find the dash in '" << word << "'"
+                        << std::endl;
             }
             assert(posIndex != std::string::npos);
             std::string pos = word.substr(posIndex + 1);
             word = word.substr(0, posIndex);
-            // new POS tag
-            if (posToInt[pos] == 0) {
-              posToInt[pos] = maxPos;
-              intToPos[maxPos] = pos;
-              npos = maxPos;
-              maxPos++;
-            }
 
-            // new word
-            if (wordsToInt[word] == 0) {
-              wordsToInt[word] = max;
-              intToWords[max] = word;
-              nwords = max;
-              max++;
-  
+            unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->posToInt,
+                                                   &vocab->intToPos);
+            unsigned num_words = vocab->CountWords(); // store for later check
+            unsigned word_id = get_or_add_word(word);
+            if (vocab->CountWords() > num_words) {
+              // A new word was added; add its chars, too.
               unsigned j = 0;
               while(j < word.length()) {
-                std::string wj = "";
-                for (unsigned h = j; h < j + UTF8Len(word[j]); h++) {
-                  wj += word[h];
-                }
-                if (charsToInt[wj] == 0) {
-                  charsToInt[wj] = maxChars;
-                  intToChars[maxChars] = wj;
-                  maxChars++;
-                }
-                j += UTF8Len(word[j]);
+                unsigned char_utf8_len = UTF8Len(word[j]);
+                std::string next_utf8_char = word.substr(j, char_utf8_len);
+                vocab->GetOrAddEntry(next_utf8_char, &vocab->charsToInt,
+                                     &vocab->intToChars);
+                j += char_utf8_len;
               }
             }
 
-            current_sent.push_back(wordsToInt[word]);
-            current_sent_pos.push_back(posToInt[pos]);
+            current_sent.push_back(word_id);
+            current_sent_pos.push_back(pos_id);
           } while(iss);
         }
         initial=false;
@@ -192,19 +203,20 @@ public:
       else if (count==1){
         int i=0;
         bool found=false;
-        for (auto a: actions) {
+        for (auto a: vocab->actions) {
           if (a==lineS) {
             std::vector<unsigned> a=correct_act_sent[sentence];
             a.push_back(i);
             correct_act_sent[sentence]=a;
             found=true;
+            break;
           }
           i++;
         }
         if (!found) {
-          actions.push_back(lineS);
+          vocab->actions.push_back(lineS);
           std::vector<unsigned> a=correct_act_sent[sentence];
-          a.push_back(actions.size()-1);
+          a.push_back(vocab->actions.size()-1);
           correct_act_sent[sentence]=a;
         }
         count=0;
@@ -221,8 +233,8 @@ public:
 
     actionsFile.close();
   /*  std::string oov="oov";
-    posToInt[oov]=maxPos;
-          intToPos[maxPos]=oov;
+    vocab->posToInt[oov]=maxPos;
+          vocab->intToPos[maxPos]=oov;
           npos=maxPos;
           maxPos++;
           wordsToInt[oov]=max;
@@ -231,36 +243,27 @@ public:
           max++;*/
 
     std::cerr << "done." << "\n";
-    for (auto a : actions) {
+    for (auto a : vocab->actions) {
       std::cerr << a << "\n";
     }
-    nactions=actions.size();
-    std::cerr<<"nactions:"<<nactions<<"\n";
-    std::cerr<<"nwords:"<<nwords<<"\n";
-    for (unsigned i=0;i<npos;i++){
-      std::cerr<<i<<":"<<intToPos[i]<<"\n";
+    std::cerr<<"# of actions:"<<vocab->CountActions()<<"\n";
+    std::cerr<<"# of words:"<<vocab->CountWords()<<"\n";
+    for (unsigned i=0;i<vocab->intToPos.size();i++){
+      std::cerr<<i<<":"<<vocab->intToPos[i]<<"\n";
     }
-    nactions=actions.size();
   }
 
 
   inline unsigned get_or_add_word(const std::string& word) {
-    unsigned& id = wordsToInt[word];
-    if (id == 0) {
-      id = max;
-      ++max;
-      intToWords[id] = word;
-      nwords = max;
-    }
-    return id;
+    return vocab->GetOrAddEntry(word, &vocab->wordsToInt, &vocab->intToWords);
   }
 
   inline void load_correct_actionsDev(std::string file) {
     std::ifstream actionsFile(file);
     std::string lineS;
 
-    assert(maxPos > 1);
-    assert(max > 3);
+    assert(vocab->posToInt.size() > 1);
+    assert(vocab->wordsToInt.size() > 3);
     int count = -1;
     int sentence = -1;
     bool initial = false;
@@ -312,43 +315,41 @@ public:
             std::string pos = word.substr(posIndex + 1);
             word = word.substr(0, posIndex);
             // new POS tag
-            if (posToInt[pos] == 0) {
-              posToInt[pos] = maxPos;
-              intToPos[maxPos] = pos;
-              npos = maxPos;
-              maxPos++;
-            }
+            unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->posToInt,
+                                                   &vocab->intToPos);
             // add an empty string for any token except OOVs (it is easy to
             // recover the surface form of non-OOV using intToWords(id)).
             current_sent_str.push_back("");
+            unsigned word_id;
             // OOV word
-            if (wordsToInt[word] == 0) {
-              if (USE_SPELLING) {
-                max = nwords + 1;
-                //std::cerr<< "max:" << max << "\n";
-                wordsToInt[word] = max;
-                intToWords[max] = word;
-                nwords = max;
-              } else {
+            if (USE_SPELLING) {
+              word_id = get_or_add_word(word);
+            } else {
+              auto word_iter = vocab->wordsToInt.find(word);
+              if (word_iter == vocab->wordsToInt.end()) {
                 // save the surface form of this OOV before overwriting it.
                 current_sent_str[current_sent_str.size()-1] = word;
-                word = Corpus::UNK;
+                word_id = vocab->wordsToInt[vocab->UNK];
+              } else {
+                word_id = word_iter->second;
               }
             }
-            current_sent.push_back(wordsToInt[word]);
-            current_sent_pos.push_back(posToInt[pos]);
+            current_sent.push_back(word_id);
+            current_sent_pos.push_back(pos_id);
           } while(iss);
         }
         initial = false;
       } else if (count == 1) {
-        auto actionIter = std::find(actions.begin(), actions.end(), lineS);
-        if (actionIter != actions.end()) {
-          unsigned actionIndex = std::distance(actions.begin(), actionIter);
+        auto actionIter = std::find(vocab->actions.begin(),
+                                    vocab->actions.end(), lineS);
+        if (actionIter != vocab->actions.end()) {
+          unsigned actionIndex = std::distance(vocab->actions.begin(),
+                                               actionIter);
           correct_act_sentDev[sentence].push_back(actionIndex);
         } else {
-          // TODO: right now, new actions which haven't been observed in training
-          // are not added to correct_act_sentDev. This may be a problem if the
-          // training data is little.
+          // TODO: right now, new actions which haven't been observed in
+          // training are not added to correct_act_sentDev. This may be a
+          // problem if the training data is little.
         }
         count=0;
       }

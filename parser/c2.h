@@ -83,12 +83,6 @@ public:
   std::map<int, std::vector<unsigned>> sentencesDev;
   std::map<int, std::vector<unsigned>> sentencesPosDev;
   std::map<int, std::vector<std::string>> sentencesStrDev;
-  unsigned nsentencesDev;
-
-  unsigned nsentences;
-
-  unsigned nsentencestest;
-  unsigned nsentencesdev;
 
   /*
   std::map<unsigned,unsigned>* headsTraining;
@@ -144,7 +138,6 @@ public:
         }
 
         sentence++;
-        nsentences = sentence;
 
         initial = true;
         current_sent.clear();
@@ -229,7 +222,6 @@ public:
       sentences[sentence] = current_sent;
       sentencesPos[sentence] = current_sent_pos;
       sentence++;
-      nsentences = sentence;
     }
 
     actionsFile.close();
@@ -284,7 +276,6 @@ public:
         }
 
         sentence++;
-        nsentencesDev = sentence;
 
         initial = true;
         current_sent.clear();
@@ -363,7 +354,6 @@ public:
       sentencesPosDev[sentence] = current_sent_pos;
       sentencesStrDev[sentence] = current_sent_str;
       sentence++;
-      nsentencesDev = sentence;
     }
 
     actionsFile.close();

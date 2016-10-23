@@ -163,13 +163,13 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
   sgd.eta_decay = 0.08;
   //sgd.eta_decay = 0.05;
   const cpyp::Corpus& corpus = parser->corpus;
-  vector<unsigned> order(corpus.nsentences);
-  for (unsigned i = 0; i < corpus.nsentences; ++i)
+  unsigned num_sentences = corpus.sentences.size();
+  vector<unsigned> order(corpus.sentences.size());
+  for (unsigned i = 0; i < corpus.sentences.size(); ++i)
     order[i] = i;
   double tot_seen = 0;
-  status_every_i_iterations = min(status_every_i_iterations, corpus.nsentences);
-  unsigned si = corpus.nsentences;
-  cerr << "NUMBER OF TRAINING SENTENCES: " << corpus.nsentences << endl;
+  status_every_i_iterations = min(status_every_i_iterations, num_sentences);
+  cerr << "NUMBER OF TRAINING SENTENCES: " << num_sentences << endl;
   unsigned trs = 0;
   double right = 0;
   double llh = 0;
@@ -179,10 +179,12 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
       std::chrono::system_clock::now());
   cerr << "TRAINING STARTED AT: " << put_time(localtime(&time_start), "%c %Z")
        << endl;
+
+  unsigned si = num_sentences;
   while (!requested_stop) {
     ++iter;
     for (unsigned sii = 0; sii < status_every_i_iterations; ++sii) {
-      if (si == corpus.nsentences) {
+      if (si == num_sentences) {
         si = 0;
         if (first) {
           first = false;
@@ -226,7 +228,7 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
     sgd.status();
     time_t time_now = std::chrono::system_clock::to_time_t(
         std::chrono::system_clock::now());
-    cerr << "update #" << iter << " (epoch " << (tot_seen / corpus.nsentences)
+    cerr << "update #" << iter << " (epoch " << (tot_seen / num_sentences)
          << " |time=" << put_time(localtime(&time_now), "%c %Z") << ")\tllh: "
          << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs
          << endl;
@@ -235,7 +237,7 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
     ++logc;
     if (logc % 25 == 1) {
       // report on dev set
-      unsigned dev_size = corpus.nsentencesDev;
+      unsigned dev_size = corpus.sentencesDev.size();
       // dev_size = 100;
       double llh = 0;
       double trs = 0;
@@ -270,7 +272,7 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
       }
       auto t_end = std::chrono::high_resolution_clock::now();
       cerr << "  **dev (iter=" << iter << " epoch="
-           << (tot_seen / corpus.nsentences) << ")\tllh=" << llh << " ppl: "
+           << (tot_seen / num_sentences) << ")\tllh=" << llh << " ppl: "
            << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: "
            << (correct_heads / total_heads) << "\t[" << dev_size << " sents in "
            << std::chrono::duration<double, std::milli>(t_end - t_start).count()
@@ -308,7 +310,7 @@ void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab) {
   double total_heads = 0;
   auto t_start = std::chrono::high_resolution_clock::now();
   const cpyp::Corpus& corpus = parser->corpus;
-  unsigned corpus_size = corpus.nsentencesDev;
+  unsigned corpus_size = corpus.sentencesDev.size();
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
     const vector<unsigned>& sentence = corpus.sentencesDev.find(sii)->second;
     const vector<unsigned>& sentencePos =

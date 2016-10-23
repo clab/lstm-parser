@@ -51,7 +51,7 @@ public:
 
 private:
   static inline int AddEntry(const std::string& str, StrToIntMap* map,
-                              std::vector<std::string>* indexed_list) {
+                             std::vector<std::string>* indexed_list) {
     int new_id = indexed_list->size();
     map->insert({str, new_id});
     indexed_list->push_back(str);
@@ -69,39 +69,39 @@ private:
   }
 };
 
-
 class Corpus {
- //typedef std::unordered_map<std::string, unsigned, std::hash<std::string> > Map;
-// typedef std::unordered_map<unsigned,std::string, std::hash<std::string> > ReverseMap;
-public: 
-   bool USE_SPELLING=false; 
+  //typedef std::unordered_map<std::string, unsigned, std::hash<std::string> > Map;
+  // typedef std::unordered_map<unsigned,std::string, std::hash<std::string> > ReverseMap;
+public:
+  bool USE_SPELLING = false;
 
-   std::map<int, std::vector<unsigned>> correct_act_sent;
-   std::map<int, std::vector<unsigned>> sentences;
-   std::map<int, std::vector<unsigned>> sentencesPos;
+  std::map<int, std::vector<unsigned>> correct_act_sent;
+  std::map<int, std::vector<unsigned>> sentences;
+  std::map<int, std::vector<unsigned>> sentencesPos;
 
-   std::map<int, std::vector<unsigned>> correct_act_sentDev;
-   std::map<int, std::vector<unsigned>> sentencesDev;
-   std::map<int, std::vector<unsigned>> sentencesPosDev;
-   std::map<int, std::vector<std::string>> sentencesStrDev;
-   unsigned nsentencesDev;
+  std::map<int, std::vector<unsigned>> correct_act_sentDev;
+  std::map<int, std::vector<unsigned>> sentencesDev;
+  std::map<int, std::vector<unsigned>> sentencesPosDev;
+  std::map<int, std::vector<std::string>> sentencesStrDev;
+  unsigned nsentencesDev;
 
-   unsigned nsentences;
+  unsigned nsentences;
 
-   unsigned nsentencestest;
-   unsigned nsentencesdev;
+  unsigned nsentencestest;
+  unsigned nsentencesdev;
 
-/*  std::map<unsigned,unsigned>* headsTraining;
+  /*
+  std::map<unsigned,unsigned>* headsTraining;
   std::map<unsigned,std::string>* labelsTraining;
 
   std::map<unsigned,unsigned>*  headsParsing;
-  std::map<unsigned,std::string>* labelsParsing;*/
+  std::map<unsigned,std::string>* labelsParsing;
+  //*/
 
-   ParserVocabulary *vocab;
-
+  ParserVocabulary *vocab;
 
 public:
-  Corpus(const std::string &file, ParserVocabulary *vocab) : vocab(vocab) {
+  Corpus(const std::string& file, ParserVocabulary* vocab) : vocab(vocab) {
     load_correct_actions(file);
   }
 
@@ -117,20 +117,20 @@ public:
   }
 
 
-  inline void load_correct_actions(const std::string &file){
+  inline void load_correct_actions(const std::string& file) {
     std::cerr << "Loading corpus from " << file << "...";
     std::ifstream actionsFile(file);
     //correct_act_sent=new vector<vector<unsigned>>();
     std::string lineS;
 
-    int count=-1;
-    int sentence=-1;
-    bool initial=false;
-    bool first=true;
+    int count = -1;
+    int sentence = -1;
+    bool initial = false;
+    bool first = true;
 
     std::vector<unsigned> current_sent;
     std::vector<unsigned> current_sent_pos;
-    while (getline(actionsFile, lineS)){
+    while (getline(actionsFile, lineS)) {
       //istringstream iss(line);
       //string lineS;
       //iss >> lineS;
@@ -163,7 +163,9 @@ public:
           do {
             std::string word;
             iss >> word;
-            if (word.size() == 0) { continue; }
+            if (word.size() == 0) {
+              continue;
+            }
             // remove the trailing comma if need be.
             if (word[word.size() - 1] == ',') {
               word = word.substr(0, word.size() - 1);
@@ -185,7 +187,7 @@ public:
             if (vocab->CountWords() > num_words) {
               // A new word was added; add its chars, too.
               unsigned j = 0;
-              while(j < word.length()) {
+              while (j < word.length()) {
                 unsigned char_utf8_len = UTF8Len(word[j]);
                 std::string next_utf8_char = word.substr(j, char_utf8_len);
                 vocab->GetOrAddEntry(next_utf8_char, &vocab->charsToInt,
@@ -196,30 +198,29 @@ public:
 
             current_sent.push_back(word_id);
             current_sent_pos.push_back(pos_id);
-          } while(iss);
+          } while (iss);
         }
-        initial=false;
-      }
-      else if (count==1){
-        int i=0;
-        bool found=false;
-        for (auto a: vocab->actions) {
-          if (a==lineS) {
-            std::vector<unsigned> a=correct_act_sent[sentence];
+        initial = false;
+      } else if (count == 1) {
+        int i = 0;
+        bool found = false;
+        for (auto a : vocab->actions) {
+          if (a == lineS) {
+            std::vector<unsigned> a = correct_act_sent[sentence];
             a.push_back(i);
-            correct_act_sent[sentence]=a;
-            found=true;
+            correct_act_sent[sentence] = a;
+            found = true;
             break;
           }
           i++;
         }
         if (!found) {
           vocab->actions.push_back(lineS);
-          std::vector<unsigned> a=correct_act_sent[sentence];
-          a.push_back(vocab->actions.size()-1);
-          correct_act_sent[sentence]=a;
+          std::vector<unsigned> a = correct_act_sent[sentence];
+          a.push_back(vocab->actions.size() - 1);
+          correct_act_sent[sentence] = a;
         }
-        count=0;
+        count = 0;
       }
     }
 
@@ -232,27 +233,26 @@ public:
     }
 
     actionsFile.close();
-  /*  std::string oov="oov";
-    vocab->posToInt[oov]=maxPos;
-          vocab->intToPos[maxPos]=oov;
-          npos=maxPos;
-          maxPos++;
-          wordsToInt[oov]=max;
-          intToWords[max]=oov;
-          nwords=max;
-          max++;*/
+    /*  std::string oov="oov";
+     vocab->posToInt[oov]=maxPos;
+     vocab->intToPos[maxPos]=oov;
+     npos=maxPos;
+     maxPos++;
+     wordsToInt[oov]=max;
+     intToWords[max]=oov;
+     nwords=max;
+     max++;*/
 
     std::cerr << "done." << "\n";
     for (auto a : vocab->actions) {
       std::cerr << a << "\n";
     }
-    std::cerr<<"# of actions:"<<vocab->CountActions()<<"\n";
-    std::cerr<<"# of words:"<<vocab->CountWords()<<"\n";
-    for (unsigned i=0;i<vocab->intToPos.size();i++){
-      std::cerr<<i<<":"<<vocab->intToPos[i]<<"\n";
+    std::cerr << "# of actions: " << vocab->CountActions() << "\n";
+    std::cerr << "# of words: " << vocab->CountWords() << "\n";
+    for (unsigned i = 0; i < vocab->intToPos.size(); i++) {
+      std::cerr << i << ":" << vocab->intToPos[i] << "\n";
     }
   }
-
 
   inline unsigned get_or_add_word(const std::string& word) {
     return vocab->GetOrAddEntry(word, &vocab->wordsToInt, &vocab->intToWords);
@@ -304,7 +304,9 @@ public:
           do {
             std::string word;
             iss >> word;
-            if (word.size() == 0) { continue; }
+            if (word.size() == 0) {
+              continue;
+            }
             // remove the trailing comma if need be.
             if (word[word.size() - 1] == ',') {
               word = word.substr(0, word.size() - 1);
@@ -328,7 +330,7 @@ public:
               auto word_iter = vocab->wordsToInt.find(word);
               if (word_iter == vocab->wordsToInt.end()) {
                 // save the surface form of this OOV before overwriting it.
-                current_sent_str[current_sent_str.size()-1] = word;
+                current_sent_str[current_sent_str.size() - 1] = word;
                 word_id = vocab->wordsToInt[vocab->UNK];
               } else {
                 word_id = word_iter->second;
@@ -336,7 +338,7 @@ public:
             }
             current_sent.push_back(word_id);
             current_sent_pos.push_back(pos_id);
-          } while(iss);
+          } while (iss);
         }
         initial = false;
       } else if (count == 1) {
@@ -351,7 +353,7 @@ public:
           // training are not added to correct_act_sentDev. This may be a
           // problem if the training data is little.
         }
-        count=0;
+        count = 0;
       }
     }
 
@@ -369,11 +371,11 @@ public:
 
   void ReplaceStringInPlace(std::string& subject, const std::string& search,
                             const std::string& replace) {
-      size_t pos = 0;
-      while ((pos = subject.find(search, pos)) != std::string::npos) {
-           subject.replace(pos, search.length(), replace);
-           pos += replace.length();
-      }
+    size_t pos = 0;
+    while ((pos = subject.find(search, pos)) != std::string::npos) {
+      subject.replace(pos, search.length(), replace);
+      pos += replace.length();
+    }
   }
 
 

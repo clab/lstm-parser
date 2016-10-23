@@ -35,9 +35,7 @@ using namespace cnn;
 using namespace std;
 namespace po = boost::program_options;
 
-
 volatile bool requested_stop = false;
-
 
 void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   po::options_description opts("Configuration options");
@@ -95,7 +93,7 @@ void signal_callback_handler(int /* signum */) {
 }
 
 
-unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp,
+unsigned compute_correct(const map<int, int>& ref, const map<int, int>& hyp,
                          unsigned len) {
   unsigned res = 0;
   for (unsigned i = 0; i < len; ++i) {
@@ -103,10 +101,12 @@ unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp,
     auto hi = hyp.find(i);
     assert(ri != ref.end());
     assert(hi != hyp.end());
-    if (ri->second == hi->second) ++res;
+    if (ri->second == hi->second)
+      ++res;
   }
   return res;
 }
+
 
 void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
                   const vector<string>& sentenceUnkStrings,
@@ -114,7 +114,7 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
                   const vector<string>& intToPos,
                   const map<string, unsigned>& wordsToInt,
                   const map<int, int>& hyp, const map<int, string>& rel_hyp) {
-  for (unsigned i = 0; i < (sentence.size()-1); ++i) {
+  for (unsigned i = 0; i < (sentence.size() - 1); ++i) {
     auto index = i + 1;
     const unsigned int unk_word =
         wordsToInt.find(cpyp::ParserVocabulary::UNK)->second;
@@ -123,11 +123,12 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
             (sentence[i] != unk_word && sentenceUnkStrings[i].size() == 0 &&
              intToWords.size() > sentence[i])));
     string wit = (sentenceUnkStrings[i].size() > 0) ?
-      sentenceUnkStrings[i] : intToWords[sentence[i]];
+				  sentenceUnkStrings[i] : intToWords[sentence[i]];
     const string& pos_tag = intToPos[pos[i]];
     assert(hyp.find(i) != hyp.end());
     auto hyp_head = hyp.find(i)->second + 1;
-    if (hyp_head == (int)sentence.size()) hyp_head = 0;
+    if (hyp_head == (int) sentence.size())
+      hyp_head = 0;
     auto hyp_rel_it = rel_hyp.find(i);
     assert(hyp_rel_it != rel_hyp.end());
     auto hyp_rel = hyp_rel_it->second;
@@ -208,7 +209,8 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
           corpus.correct_act_sent.find(order[si])->second;
       ComputationGraph hg;
       parser->LogProbParser(&hg, sentence, tsentence, sentencePos, actions,
-          corpus.vocab->actions, corpus.vocab->intToWords, &right);
+                            corpus.vocab->actions, corpus.vocab->intToWords,
+                            &right);
       double lp = as_scalar(hg.incremental_forward());
       if (lp < 0) {
         cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp
@@ -253,16 +255,16 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
           if (training_vocab.count(w) == 0)
             w = parser->kUNK;
         ComputationGraph hg;
-        vector<unsigned> pred = parser->LogProbParser(&hg, sentence,
-            tsentence, sentencePos, vector<unsigned>(), corpus.vocab->actions,
-            corpus.vocab->intToWords, &right);
+        vector<unsigned> pred = parser->LogProbParser(
+            &hg, sentence, tsentence, sentencePos, vector<unsigned>(),
+            corpus.vocab->actions, corpus.vocab->intToWords, &right);
         double lp = 0;
         llh -= lp;
         trs += actions.size();
         map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
-            corpus.vocab->actions);
+                                                 corpus.vocab->actions);
         map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
-            corpus.vocab->actions);
+                                                 corpus.vocab->actions);
         correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
         total_heads += sentence.size() - 1;
       }
@@ -330,9 +332,9 @@ void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab) {
     map<int, string> rel_ref;
     map<int, string> rel_hyp;
     map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
-        corpus.vocab->actions, &rel_ref);
+                                             corpus.vocab->actions, &rel_ref);
     map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
-        corpus.vocab->actions, &rel_hyp);
+                                             corpus.vocab->actions, &rel_hyp);
     output_conll(sentence, sentencePos, sentenceUnkStr,
                  corpus.vocab->intToWords, corpus.vocab->intToPos,
                  corpus.vocab->wordsToInt, hyp, rel_hyp);
@@ -394,7 +396,7 @@ int main(int argc, char** argv) {
     model_stream_ptr.reset(new ifstream(model_path.c_str()));
     archive_ptr.reset(new boost::archive::text_iarchive(*model_stream_ptr));
 
-    ParserOptions stored_options {};
+    ParserOptions stored_options{};
     *archive_ptr >> stored_options;
     if (stored_options != options) {
       cerr << "WARNING: overriding command line network options with stored"
@@ -420,7 +422,8 @@ int main(int argc, char** argv) {
       }
     if (train) {
       for (auto wc : counts)
-        if (wc.second == 1) singletons.insert(wc.first);
+        if (wc.second == 1)
+          singletons.insert(wc.first);
     }
   }
 

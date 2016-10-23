@@ -113,14 +113,14 @@ public:
   //               sent will have words replaced by appropriate UNK tokens
   // this lets us use pretrained embeddings, when available, for words that were
   // OOV in the parser training data.
-  std::vector<unsigned> LogProbParser(cnn::ComputationGraph* hg,
-                       const std::vector<unsigned>& raw_sent,  // raw sentence
-                       const std::vector<unsigned>& sent,  // w/ oovs replaced
-                       const std::vector<unsigned>& sentPos,
-                       const std::vector<unsigned>& correct_actions,
-                       const std::vector<std::string>& setOfActions,
-                       const std::vector<std::string>& intToWords,
-                       double *right);
+  std::vector<unsigned> LogProbParser(
+      cnn::ComputationGraph* hg,
+      const std::vector<unsigned>& raw_sent,  // raw sentence
+      const std::vector<unsigned>& sent,  // w/ oovs replaced
+      const std::vector<unsigned>& sentPos,
+      const std::vector<unsigned>& correct_actions,
+      const std::vector<std::string>& setOfActions,
+      const std::vector<std::string>& intToWords, double *right);
 
   void LoadPretrainedWords(const std::string& words_path) {
     std::cerr << "Loading word std::vectors from " << words_path;
@@ -144,7 +144,8 @@ public:
     while (getline(in, line)) {
       std::istringstream lin(line);
       lin >> word;
-      for (unsigned i = 0; i < pretrained_dim; ++i) lin >> v[i];
+      for (unsigned i = 0; i < pretrained_dim; ++i)
+        lin >> v[i];
       unsigned id = corpus.get_or_add_word(word);
       pretrained[id] = v;
     }

@@ -32,7 +32,6 @@ using namespace cnn;
 using namespace std;
 namespace po = boost::program_options;
 
-
 constexpr const char* ParserBuilder::ROOT_SYMBOL;
 
 
@@ -100,48 +99,58 @@ ParserBuilder::ParserBuilder(const string& training_path,
 
 
 bool ParserBuilder::IsActionForbidden(const string& a, unsigned bsize,
-                                      unsigned ssize, const vector<int>& stacki) {
-  if (a[1]=='W' && ssize<3) return true;
-  if (a[1]=='W') {
-        int top=stacki[stacki.size()-1];
-        int sec=stacki[stacki.size()-2];
-        if (sec>top) return true;
+                                      unsigned ssize,
+                                      const vector<int>& stacki) {
+  if (a[1] == 'W' && ssize < 3)
+    return true;
+  if (a[1] == 'W') {
+    int top = stacki[stacki.size() - 1];
+    int sec = stacki[stacki.size() - 2];
+    if (sec > top)
+      return true;
   }
 
-  bool is_shift = (a[0] == 'S' && a[1]=='H');
+  bool is_shift = (a[0] == 'S' && a[1] == 'H');
   bool is_reduce = !is_shift;
-  if (is_shift && bsize == 1) return true;
-  if (is_reduce && ssize < 3) return true;
+  if (is_shift && bsize == 1)
+    return true;
+  if (is_reduce && ssize < 3)
+    return true;
   if (bsize == 2 && // ROOT is the only thing remaining on buffer
       ssize > 2 && // there is more than a single element on the stack
-      is_shift) return true;
+      is_shift)
+    return true;
   // only attach left to ROOT
-  if (bsize == 1 && ssize == 3 && a[0] == 'R') return true;
+  if (bsize == 1 && ssize == 3 && a[0] == 'R')
+    return true;
   return false;
 }
 
 
-map<int,int> ParserBuilder::ComputeHeads(unsigned sent_len,
+map<int, int> ParserBuilder::ComputeHeads(unsigned sent_len,
                                           const vector<unsigned>& actions,
                                           const vector<string>& setOfActions,
-                                          map<int,string>* pr) {
-  map<int,int> heads;
-  map<int,string> r;
-  map<int,string>& rels = (pr ? *pr : r);
-  for(unsigned i=0;i<sent_len;i++) { heads[i]=-1; rels[i]="ERROR"; }
+                                          map<int, string>* pr) {
+  map<int, int> heads;
+  map<int, string> r;
+  map<int, string>& rels = (pr ? *pr : r);
+  for (unsigned i = 0; i < sent_len; i++) {
+    heads[i] = -1;
+    rels[i] = "ERROR";
+  }
   vector<int> bufferi(sent_len + 1, 0), stacki(1, -999);
   for (unsigned i = 0; i < sent_len; ++i)
     bufferi[sent_len - i] = i;
   bufferi[0] = -999;
-  for (auto action: actions) { // loop over transitions for sentence
-    const string& actionString=setOfActions[action];
+  for (auto action : actions) { // loop over transitions for sentence
+    const string& actionString = setOfActions[action];
     const char ac = actionString[0];
     const char ac2 = actionString[1];
-    if (ac =='S' && ac2=='H') {  // SHIFT
+    if (ac == 'S' && ac2 == 'H') {  // SHIFT
       assert(bufferi.size() > 1); // dummy symbol means > 1 (not >= 1)
       stacki.push_back(bufferi.back());
       bufferi.pop_back();
-    } else if (ac=='S' && ac2=='W') { // SWAP
+    } else if (ac == 'S' && ac2 == 'W') { // SWAP
       assert(stacki.size() > 2);
       unsigned ii = 0, jj = 0;
       jj = stacki.back();
@@ -169,14 +178,13 @@ map<int,int> ParserBuilder::ComputeHeads(unsigned sent_len,
 }
 
 
-vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
-                   const vector<unsigned>& raw_sent,  // raw sentence
-                   const vector<unsigned>& sent,  // sent with oovs replaced
-                   const vector<unsigned>& sentPos,
-                   const vector<unsigned>& correct_actions,
-                   const vector<string>& setOfActions,
-                   const vector<std::string>& intToWords,
-                   double *right) {
+vector<unsigned> ParserBuilder::LogProbParser(
+    ComputationGraph* hg,
+    const vector<unsigned>& raw_sent,  // raw sentence
+    const vector<unsigned>& sent,  // sentence with oovs replaced
+    const vector<unsigned>& sentPos, const vector<unsigned>& correct_actions,
+    const vector<string>& setOfActions, const vector<std::string>& intToWords,
+    double *right) {
   vector<unsigned> results;
   const bool build_training_graph = correct_actions.size() > 0;
 
@@ -209,13 +217,13 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
 
   action_lstm.add_input(action_start);
 
-  vector<Expression> buffer(sent.size() + 1);  // variables representing word embeddings (possibly including POS info)
-  vector<int> bufferi(sent.size() + 1);  // position of the words in the sentence
+  vector<Expression> buffer(sent.size() + 1); // variables representing word embeddings (possibly including POS info)
+  vector<int> bufferi(sent.size() + 1); // position of the words in the sentence
   // precompute buffer representation from left to right
 
   for (unsigned i = 0; i < sent.size(); ++i) {
     assert(sent[i] < vocab_size);
-    Expression w =lookup(*hg, p_w, sent[i]);
+    Expression w = lookup(*hg, p_w, sent[i]);
 
     vector<Expression> args = {ib, w2l, w}; // learn embeddings
     if (options.use_pos) { // learn POS tag?
@@ -223,7 +231,7 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
       args.push_back(p2l);
       args.push_back(p);
     }
-    if (p_t && pretrained.count(raw_sent[i])) {  // include fixed pretrained vectors?
+    if (p_t && pretrained.count(raw_sent[i])) { // include fixed pretrained vectors?
       Expression t = const_lookup(*hg, p_t, raw_sent[i]);
       args.push_back(t2l);
       args.push_back(t);
@@ -246,7 +254,7 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
   vector<Expression> log_probs;
   string rootword;
   unsigned action_count = 0;  // incremented at each prediction
-  while(stack.size() > 2 || buffer.size() > 1) {
+  while (stack.size() > 2 || buffer.size() > 1) {
     // get list of possible actions for the current parser state
     vector<unsigned> current_valid_actions;
     for (unsigned action = 0; action < n_possible_actions; ++action) {
@@ -276,9 +284,11 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
       }
     }
     unsigned action = best_a;
-    if (build_training_graph) {  // if we have reference actions (for training) use the reference action
+    if (build_training_graph) { // if we have reference actions (for training) use the reference action
       action = correct_actions[action_count];
-      if (best_a == action) { (*right)++; }
+      if (best_a == action) {
+        (*right)++;
+      }
     }
     ++action_count;
     log_probs.push_back(pick(adiste, action));
@@ -292,12 +302,11 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
     Expression relation = lookup(*hg, p_r, action);
 
     // do action
-    const string& actionString=setOfActions[action];
+    const string& actionString = setOfActions[action];
     const char ac = actionString[0];
     const char ac2 = actionString[1];
 
-
-    if (ac =='S' && ac2=='H') {  // SHIFT
+    if (ac == 'S' && ac2 == 'H') {  // SHIFT
       assert(buffer.size() > 1); // dummy symbol means > 1 (not >= 1)
       stack.push_back(buffer.back());
       stack_lstm.add_input(buffer.back());
@@ -305,18 +314,18 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
       buffer_lstm.rewind_one_step();
       stacki.push_back(bufferi.back());
       bufferi.pop_back();
-    } else if (ac=='S' && ac2=='W'){ //SWAP --- Miguel
+    } else if (ac == 'S' && ac2 == 'W') { //SWAP --- Miguel
       assert(stack.size() > 2); // dummy symbol means > 2 (not >= 2)
 
       Expression toki, tokj;
       unsigned ii = 0, jj = 0;
-      tokj=stack.back();
-      jj=stacki.back();
+      tokj = stack.back();
+      jj = stacki.back();
       stack.pop_back();
       stacki.pop_back();
 
-      toki=stack.back();
-      ii=stacki.back();
+      toki = stack.back();
+      ii = stacki.back();
       stack.pop_back();
       stacki.pop_back();
 
@@ -345,9 +354,11 @@ vector<unsigned> ParserBuilder::LogProbParser(ComputationGraph* hg,
       (ac == 'R' ? headi : depi) = stacki.back();
       stack.pop_back();
       stacki.pop_back();
-      if (headi == sent.size() - 1) rootword = intToWords[sent[depi]];
+      if (headi == sent.size() - 1)
+        rootword = intToWords[sent[depi]];
       // composed = cbias + H * head + D * dep + R * relation
-      Expression composed = affine_transform({cbias, H, head, D, dep, R, relation});
+      Expression composed = affine_transform({cbias, H, head, D, dep, R,
+                                              relation});
       Expression nlcomposed = tanh(composed);
       stack_lstm.rewind_one_step();
       stack_lstm.rewind_one_step();

@@ -153,7 +153,8 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 
 void do_train(ParserBuilder* parser, const unsigned unk_strategy,
               const set<unsigned>& singletons, const double unk_prob,
-              const set<unsigned>& training_vocab, const string& fname) {
+              const set<unsigned>& training_vocab, const string& fname,
+              const cpyp::Corpus& dev_corpus) {
   bool softlinkCreated = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
@@ -237,7 +238,7 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
     ++logc;
     if (logc % 25 == 1) {
       // report on dev set
-      unsigned dev_size = corpus.sentencesDev.size();
+      unsigned dev_size = dev_corpus.sentences.size();
       // dev_size = 100;
       double llh = 0;
       double trs = 0;
@@ -247,11 +248,11 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
       auto t_start = std::chrono::high_resolution_clock::now();
       for (unsigned sii = 0; sii < dev_size; ++sii) {
         const vector<unsigned>& sentence =
-            corpus.sentencesDev.find(sii)->second;
+            dev_corpus.sentences.find(sii)->second;
         const vector<unsigned>& sentencePos =
-            corpus.sentencesPosDev.find(sii)->second;
+            dev_corpus.sentencesPos.find(sii)->second;
         const vector<unsigned>& actions =
-            corpus.correct_act_sentDev.find(sii)->second;
+            dev_corpus.correct_act_sent.find(sii)->second;
         vector<unsigned> tsentence = sentence;
         for (auto& w : tsentence)
           if (training_vocab.count(w) == 0)
@@ -259,14 +260,14 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
         ComputationGraph hg;
         vector<unsigned> pred = parser->LogProbParser(
             &hg, sentence, tsentence, sentencePos, vector<unsigned>(),
-            corpus.vocab->actions, corpus.vocab->intToWords, &right);
+            dev_corpus.vocab->actions, dev_corpus.vocab->intToWords, &right);
         double lp = 0;
         llh -= lp;
         trs += actions.size();
         map<int, int> ref = parser->ComputeHeads(sentence.size(), actions,
-                                                 corpus.vocab->actions);
+                                                 dev_corpus.vocab->actions);
         map<int, int> hyp = parser->ComputeHeads(sentence.size(), pred,
-                                                 corpus.vocab->actions);
+                                                 dev_corpus.vocab->actions);
         correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
         total_heads += sentence.size() - 1;
       }
@@ -301,7 +302,8 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
 }
 
 
-void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab) {
+void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab,
+             const cpyp::Corpus& corpus) {
   // do test evaluation
   double llh = 0;
   double trs = 0;
@@ -309,16 +311,15 @@ void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab) {
   double correct_heads = 0;
   double total_heads = 0;
   auto t_start = std::chrono::high_resolution_clock::now();
-  const cpyp::Corpus& corpus = parser->corpus;
-  unsigned corpus_size = corpus.sentencesDev.size();
+  unsigned corpus_size = corpus.sentences.size();
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
-    const vector<unsigned>& sentence = corpus.sentencesDev.find(sii)->second;
+    const vector<unsigned>& sentence = corpus.sentences.find(sii)->second;
     const vector<unsigned>& sentencePos =
-        corpus.sentencesPosDev.find(sii)->second;
+        corpus.sentencesPos.find(sii)->second;
     const vector<string>& sentenceUnkStr =
-        corpus.sentencesStrDev.find(sii)->second;
+        corpus.sentencesSurfaceForms.find(sii)->second;
     const vector<unsigned>& actions =
-        corpus.correct_act_sentDev.find(sii)->second;
+        corpus.correct_act_sent.find(sii)->second;
     vector<unsigned> tsentence = sentence;
     for (auto& w : tsentence)
       if (training_vocab.count(w) == 0)
@@ -433,7 +434,8 @@ int main(int argc, char** argv) {
        << endl;
 
   // OOV words will be replaced by UNK tokens
-  parser.corpus.load_correct_actionsDev(conf["dev_data"].as<string>());
+  // TODO: should dev_corpus get its own vocab?
+  cpyp::Corpus dev_corpus(conf["dev_data"].as<string>(), parser.corpus.vocab);
   if (train) {
     ostringstream os;
     os << "parser_" << (options.use_pos ? "pos" : "nopos")
@@ -448,10 +450,10 @@ int main(int argc, char** argv) {
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
     do_train(&parser, unk_strategy, singletons, unk_prob, training_vocab,
-             fname);
+             fname, dev_corpus);
   }
   if (test) { // do test evaluation
-    do_test(&parser, training_vocab);
+    do_test(&parser, training_vocab, dev_corpus);
   }
 
   /*

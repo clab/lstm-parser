@@ -39,6 +39,8 @@ public:
   ParserVocabulary() {
     AddEntry(BAD0, &wordsToInt, &intToWords);
     AddEntry(UNK, &wordsToInt, &intToWords);
+    // For some reason, original LSTM parser had char and POS lists starting at
+    // index 1.
     AddEntry("", &posToInt, &intToPos);
     AddEntry("", &charsToInt, &intToChars);
     AddEntry(BAD0, &charsToInt, &intToChars);
@@ -78,11 +80,7 @@ public:
   std::map<int, std::vector<unsigned>> correct_act_sent;
   std::map<int, std::vector<unsigned>> sentences;
   std::map<int, std::vector<unsigned>> sentencesPos;
-
-  std::map<int, std::vector<unsigned>> correct_act_sentDev;
-  std::map<int, std::vector<unsigned>> sentencesDev;
-  std::map<int, std::vector<unsigned>> sentencesPosDev;
-  std::map<int, std::vector<std::string>> sentencesStrDev;
+  std::map<int, std::vector<std::string>> sentencesSurfaceForms;
 
   /*
   std::map<unsigned,unsigned>* headsTraining;
@@ -251,6 +249,7 @@ public:
   }
 
   inline void load_correct_actionsDev(std::string file) {
+    std::cerr << "Loading dev corpus from " << file << "...";
     std::ifstream actionsFile(file);
     std::string lineS;
 
@@ -270,9 +269,9 @@ public:
         // an empty line marks the end of a sentence.
         count = 0;
         if (!first) {
-          sentencesDev[sentence] = current_sent;
-          sentencesPosDev[sentence] = current_sent_pos;
-          sentencesStrDev[sentence] = current_sent_str;
+          sentences[sentence] = current_sent;
+          sentencesPos[sentence] = current_sent_pos;
+          sentencesSurfaceForms[sentence] = current_sent_str;
         }
 
         sentence++;
@@ -338,7 +337,7 @@ public:
         if (actionIter != vocab->actions.end()) {
           unsigned actionIndex = std::distance(vocab->actions.begin(),
                                                actionIter);
-          correct_act_sentDev[sentence].push_back(actionIndex);
+          correct_act_sent[sentence].push_back(actionIndex);
         } else {
           // TODO: right now, new actions which haven't been observed in
           // training are not added to correct_act_sentDev. This may be a
@@ -350,9 +349,9 @@ public:
 
     // Add the last sentence.
     if (current_sent.size() > 0) {
-      sentencesDev[sentence] = current_sent;
-      sentencesPosDev[sentence] = current_sent_pos;
-      sentencesStrDev[sentence] = current_sent_str;
+      sentences[sentence] = current_sent;
+      sentencesPos[sentence] = current_sent_pos;
+      sentencesSurfaceForms[sentence] = current_sent_str;
       sentence++;
     }
 

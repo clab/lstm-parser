@@ -54,7 +54,13 @@ ParserBuilder::ParserBuilder(const string& training_path,
   if (!pretrained_words_path.empty()) {
     LoadPretrainedWords(pretrained_words_path);
   }
-  vocab_size = corpus.nwords + 1; // set here so that it's available for p_t
+
+  // Now that the corpus is finalized, we can set all the network parameters.
+  action_size = corpus.nactions + 1;
+  pos_size = corpus.npos + 10; // bad way of dealing with the fact that we
+                               // may see new POS tags in the test set
+  n_possible_actions = corpus.nactions;
+  vocab_size = corpus.nwords + 1; // needs to be set for p_t
 
   if (!pretrained_words_path.empty()) {
     unsigned pretrained_dim = pretrained.begin()->second.size();
@@ -66,13 +72,6 @@ ParserBuilder::ParserBuilder(const string& training_path,
     p_t = nullptr;
     p_t2l = nullptr;
   }
-
-  // Now that the corpus is finalized, we can set all the network parameters.
-  vocab_size = corpus.nwords + 1;
-  action_size = corpus.nactions + 1;
-  pos_size = corpus.npos + 10; // bad way of dealing with the fact that we
-                                // may see new POS tags in the test set
-  n_possible_actions = corpus.nactions;
 
   p_w = model.add_lookup_parameters(vocab_size, {options.input_dim});
   p_a = model.add_lookup_parameters(action_size, {options.action_dim});

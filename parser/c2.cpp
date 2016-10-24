@@ -4,6 +4,10 @@ using namespace std;
 
 namespace cpyp {
 
+constexpr const char* ParserVocabulary::UNK;
+constexpr const char* ParserVocabulary::BAD0;
+
+
 void Corpus::load_correct_actions(const string& file) {
   cerr << "Loading corpus from " << file << "...";
   ifstream actionsFile(file);

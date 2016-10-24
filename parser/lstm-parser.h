@@ -47,19 +47,19 @@ struct ParserOptions {
         && rel_dim == other.rel_dim;
   }
 
-  inline bool operator!=(const ParserOptions& other) {
+  inline bool operator!=(const ParserOptions& other) const {
     return !operator==(other);
   }
 };
 
 
-class ParserBuilder {
+class ParserBuilder { // TODO: rename
 public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
-  const ParserOptions options;
-  cnn::Model model;
+  ParserOptions options;
   cpyp::ParserVocabulary vocab;
+  cnn::Model model;
 
   bool finalized;
   std::unordered_map<unsigned, std::vector<float>> pretrained;
@@ -154,6 +154,16 @@ public:
   }
 
   void FinalizeVocab();
+
+private:
+  friend class boost::serialization::access;
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int version) {
+    ar & options;
+    ar & vocab;
+    FinalizeVocab(); // finalize *after* vocab to make load work
+    ar & model;
+  }
 };
 
 #endif // #ifndef LSTM_PARSER_H

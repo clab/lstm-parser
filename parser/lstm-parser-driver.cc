@@ -274,8 +274,7 @@ void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
         best_correct_heads = correct_heads;
         ofstream out(fname);
         boost::archive::text_oarchive oa(out);
-        oa << parser->options;
-        oa << parser->model;
+        oa << *parser;
         // Create a soft link to the most recent model in order to make it
         // easier to refer to it in a shell script.
         if (!softlinkCreated) {
@@ -353,21 +352,6 @@ int main(int argc, char** argv) {
   po::variables_map conf;
   InitCommandLine(argc, argv, &conf);
 
-  bool load_model = conf.count("model");
-  unique_ptr<boost::archive::text_iarchive> archive_ptr;
-  unique_ptr<ifstream> model_stream_ptr;
-
-  ParserOptions options {
-    conf.count("use_pos_tags"),
-    conf["layers"].as<unsigned>(),
-    conf["input_dim"].as<unsigned>(),
-    conf["hidden_dim"].as<unsigned>(),
-    conf["action_dim"].as<unsigned>(),
-    conf["lstm_input_dim"].as<unsigned>(),
-    conf["pos_dim"].as<unsigned>(),
-    conf["rel_dim"].as<unsigned>()
-  };
-
   // Training options and operation options
   const unsigned unk_strategy = conf["unk_strategy"].as<unsigned>();
   const double unk_prob = conf["unk_prob"].as<double>();
@@ -382,28 +366,34 @@ int main(int argc, char** argv) {
   }
   assert(unk_prob >= 0. && unk_prob <= 1.);
 
-  if (load_model) {
+  ParserOptions cmd_options {
+    conf.count("use_pos_tags"),
+    conf["layers"].as<unsigned>(),
+    conf["input_dim"].as<unsigned>(),
+    conf["hidden_dim"].as<unsigned>(),
+    conf["action_dim"].as<unsigned>(),
+    conf["lstm_input_dim"].as<unsigned>(),
+    conf["pos_dim"].as<unsigned>(),
+    conf["rel_dim"].as<unsigned>()
+  };
+
+  ParserBuilder parser(conf["words"].as<string>(), cmd_options, false);
+  if (conf.count("model")) {
     const string& model_path = conf["model"].as<string>();
     cerr << "Loading model from " << model_path << endl;
-    model_stream_ptr.reset(new ifstream(model_path.c_str()));
-    archive_ptr.reset(new boost::archive::text_iarchive(*model_stream_ptr));
+    ifstream model_stream(model_path.c_str());
+    boost::archive::text_iarchive archive(model_stream);
+    archive >> parser;
 
-    ParserOptions stored_options{};
-    *archive_ptr >> stored_options;
-    if (stored_options != options) {
+    if (parser.options != cmd_options) {
       // TODO: make this recognize the difference between a default option and
       // one that was actually specified on the command line, and only warn for
       // the latter.
-      cerr << "WARNING: overriding command line network options with stored"
+      cerr << "WARNING: overriding command line network options with saved"
               " options" << endl;
-      options = stored_options;
     }
   }
 
-  ParserBuilder parser(conf["words"].as<string>(), move(options), false);
-  if (load_model) {
-    *archive_ptr >> parser.model;
-  }
   // TODO: make this conditional on whether we load training data (which now we
   // don't need to).
   cpyp::Corpus training_corpus(conf["training_data"].as<string>(),

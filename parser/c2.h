@@ -1,7 +1,9 @@
 #ifndef CPYPDICT_H_
 #define CPYPDICT_H_
 
+#include <boost/serialization/split_member.hpp>
 #include <stddef.h>
+#include <iostream>
 #include <map>
 #include <string>
 #include <utility>
@@ -45,6 +47,51 @@ public:
   }
 
 private:
+  friend class boost::serialization::access;
+
+  template<class Archive, class ParserType>
+  // Shared code: serialize the number-to-string mappings, from which the
+  // reverse mappings can be reconstructed.
+  static void serializeLists(Archive& ar, const unsigned int version,
+                             ParserType* parser) {
+    ar & parser->intToWords;
+    ar & parser->intToPos;
+    ar & parser->intToChars;
+    ar & parser->actions;
+  }
+
+  template<class Archive>
+  void save(Archive& ar, const unsigned int version) const {
+    serializeLists(ar, version, this);
+  }
+
+  template<class Archive>
+  void load(Archive& ar, const unsigned int version) {
+    unsigned num_existing_words = intToWords.size();
+
+    wordsToInt.clear();
+    intToWords.clear();
+    posToInt.clear();
+    intToPos.clear();
+    charsToInt.clear();
+    intToChars.clear();
+
+    serializeLists(ar, version, this);
+    if (intToWords.size() < num_existing_words) {
+      std::cerr << "WARNING: lost " << num_existing_words - intToWords.size()
+                << " words when loading model" << std::endl;
+    }
+
+    // Now reconstruct the reverse mappings.
+    for (size_t i = 0; i < intToWords.size(); ++i)
+      wordsToInt[intToWords[i]] = i;
+    for (size_t i = 0; i < intToPos.size(); ++i)
+      posToInt[intToPos[i]] = i;
+    for (size_t i = 0; i < intToChars.size(); ++i)
+      charsToInt[intToChars[i]] = i;
+  }
+  BOOST_SERIALIZATION_SPLIT_MEMBER()
+
   static inline int AddEntry(const std::string& str, StrToIntMap* map,
                              std::vector<std::string>* indexed_list) {
     int new_id = indexed_list->size();

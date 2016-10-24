@@ -4,8 +4,8 @@ using namespace std;
 
 namespace cpyp {
 
-constexpr const char* ParserVocabulary::UNK;
-constexpr const char* ParserVocabulary::BAD0;
+const string ParserVocabulary::UNK = "<UNK>";
+const string ParserVocabulary::BAD0 = "<BAD0>";
 
 
 void Corpus::load_correct_actions(const string& file) {

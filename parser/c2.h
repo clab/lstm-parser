@@ -23,8 +23,8 @@ public:
   typedef std::map<std::string, unsigned> StrToIntMap;
 
   // String literals
-  static constexpr const char* UNK = "<UNK>";
-  static constexpr const char* BAD0 = "<BAD0>";
+  static const std::string UNK;
+  static const std::string BAD0;
 
   StrToIntMap wordsToInt;
   std::vector<std::string> intToWords;

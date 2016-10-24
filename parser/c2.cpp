@@ -27,7 +27,7 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
 
   vector<unsigned> current_sent;
   vector<unsigned> current_sent_pos;
-  vector<string> current_sent_surface_str; // TODO: pluralize name
+  vector<string> current_sent_surface_strs;
   while (getline(actionsFile, lineS)) {
     //istringstream iss(line);
     //string lineS;
@@ -45,7 +45,7 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
         sentencesPos.back().swap(current_sent_pos);
         if (!is_training) {
           sentencesSurfaceForms.push_back({});
-          sentencesSurfaceForms.back().swap(current_sent_surface_str);
+          sentencesSurfaceForms.back().swap(current_sent_surface_strs);
         }
       }
       start_of_sentence = true;
@@ -105,15 +105,15 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
             // OOV word
             if (USE_SPELLING) {
               word_id = get_or_add_word(word);
-              current_sent_surface_str.push_back("");
+              current_sent_surface_strs.push_back("");
             } else {
               auto word_iter = vocab->wordsToInt.find(word);
               if (word_iter == vocab->wordsToInt.end()) {
                 // Save the surface form of this OOV.
-                current_sent_surface_str.push_back(word);
+                current_sent_surface_strs.push_back(word);
                 word_id = vocab->wordsToInt[vocab->UNK];
               } else {
-                current_sent_surface_str.push_back("");
+                current_sent_surface_strs.push_back("");
                 word_id = word_iter->second;
               }
             }
@@ -159,7 +159,7 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
     sentences.push_back(move(current_sent));
     sentencesPos.push_back(move(current_sent_pos));
     if (!is_training) {
-      sentencesSurfaceForms.push_back(move(current_sent_surface_str));
+      sentencesSurfaceForms.push_back(move(current_sent_surface_strs));
     }
   }
 

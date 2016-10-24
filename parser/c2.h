@@ -32,11 +32,6 @@ public:
   ParserVocabulary() {
     AddEntry(BAD0, &wordsToInt, &intToWords);
     AddEntry(UNK, &wordsToInt, &intToWords);
-    // For some reason, original LSTM parser had char and POS lists starting at
-    // index 1.
-    // TODO: remove these
-    AddEntry("", &posToInt, &intToPos);
-    AddEntry("", &charsToInt, &intToChars);
     AddEntry(BAD0, &charsToInt, &intToChars);
   }
 

@@ -14,17 +14,15 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;
   ifstream actionsFile(file);
-  //correct_act_sent=new vector<vector<unsigned>>();
   string lineS;
 
   bool next_is_action_line = false;
-  int sentence = 0;
   bool start_of_sentence = false;
   bool first = true;
 
   vector<unsigned> current_sent;
   vector<unsigned> current_sent_pos;
-  vector<string> current_sent_surface_str;
+  vector<string> current_sent_surface_str; // TODO: pluralize name
   while (getline(actionsFile, lineS)) {
     //istringstream iss(line);
     //string lineS;
@@ -36,12 +34,14 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
       next_is_action_line = false;
       if (!first) { // first line is blank, but no sentence yet
         // Store the sentence variables and clear them for the next sentence.
-        sentences[sentence].swap(current_sent);
-        sentencesPos[sentence].swap(current_sent_pos);
+        sentences.push_back({});
+        sentences.back().swap(current_sent);
+        sentencesPos.push_back({});
+        sentencesPos.back().swap(current_sent_pos);
         if (!is_training) {
-          sentencesSurfaceForms[sentence].swap(current_sent_surface_str);
+          sentencesSurfaceForms.push_back({});
+          sentencesSurfaceForms.back().swap(current_sent_surface_str);
         }
-        sentence++;
       }
       start_of_sentence = true;
       continue; // don't update next_is_action_line
@@ -118,18 +118,23 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
           current_sent_pos.push_back(pos_id);
         } while (iss);
       }
-      start_of_sentence = false;
     } else if (next_is_action_line) {
       auto action_iter = find(vocab->actions.begin(), vocab->actions.end(),
                               lineS);
       if (action_iter != vocab->actions.end()) {
         unsigned action_index = distance(vocab->actions.begin(), action_iter);
-        correct_act_sent[sentence].push_back(action_index);
+        if (start_of_sentence)
+          correct_act_sent.push_back({action_index});
+        else
+          correct_act_sent.back().push_back(action_index);
       } else { // A not-previously-seen action
         if (is_training) {
           vocab->actions.push_back(lineS);
           unsigned action_index = vocab->actions.size() - 1;
-          correct_act_sent[sentence].push_back(action_index);
+          if (start_of_sentence)
+            correct_act_sent.push_back({action_index});
+          else
+            correct_act_sent.back().push_back(action_index);
         } else {
           // TODO: right now, new actions which haven't been observed in
           // training are not added to correct_act_sent. In dev/test, this may
@@ -138,6 +143,7 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
                << lineS << endl;
         }
       }
+      start_of_sentence = false;
     }
 
     next_is_action_line = !next_is_action_line;
@@ -145,12 +151,11 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
 
   // Add the last sentence.
   if (current_sent.size() > 0) {
-    sentences[sentence] = current_sent;
-    sentencesPos[sentence] = current_sent_pos;
+    sentences.push_back(move(current_sent));
+    sentencesPos.push_back(move(current_sent_pos));
     if (!is_training) {
-      sentencesSurfaceForms[sentence] = current_sent_surface_str;
+      sentencesSurfaceForms.push_back(move(current_sent_surface_str));
     }
-    sentence++;
   }
 
   actionsFile.close();

@@ -42,6 +42,7 @@ public:
     AddEntry(UNK, &wordsToInt, &intToWords);
     // For some reason, original LSTM parser had char and POS lists starting at
     // index 1.
+    // TODO: remove these
     AddEntry("", &posToInt, &intToPos);
     AddEntry("", &charsToInt, &intToChars);
     AddEntry(BAD0, &charsToInt, &intToChars);
@@ -78,10 +79,10 @@ class Corpus {
 public:
   bool USE_SPELLING = false;
 
-  std::map<int, std::vector<unsigned>> correct_act_sent;
-  std::map<int, std::vector<unsigned>> sentences;
-  std::map<int, std::vector<unsigned>> sentencesPos;
-  std::map<int, std::vector<std::string>> sentencesSurfaceForms;
+  std::vector<std::vector<unsigned>> correct_act_sent;
+  std::vector<std::vector<unsigned>> sentences;
+  std::vector<std::vector<unsigned>> sentencesPos;
+  std::vector<std::vector<std::string>> sentencesSurfaceForms;
 
   /*
   std::map<unsigned,unsigned>* headsTraining;

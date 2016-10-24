@@ -197,8 +197,7 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
         random_shuffle(order.begin(), order.end());
       }
       tot_seen += 1;
-      const vector<unsigned>& sentence =
-          corpus.sentences.find(order[si])->second;
+      const vector<unsigned>& sentence = corpus.sentences[order[si]];
       vector<unsigned> tsentence = sentence;
       if (unk_strategy == 1) {
         for (auto& w : tsentence) {
@@ -207,10 +206,8 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
           }
         }
       }
-      const vector<unsigned>& sentencePos =
-          corpus.sentencesPos.find(order[si])->second;
-      const vector<unsigned>& actions =
-          corpus.correct_act_sent.find(order[si])->second;
+      const vector<unsigned>& sentencePos = corpus.sentencesPos[order[si]];
+      const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
       ComputationGraph hg;
       parser->LogProbParser(&hg, sentence, tsentence, sentencePos, actions,
                             corpus.vocab->actions, corpus.vocab->intToWords,
@@ -248,12 +245,9 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
       double total_heads = 0;
       auto t_start = std::chrono::high_resolution_clock::now();
       for (unsigned sii = 0; sii < dev_size; ++sii) {
-        const vector<unsigned>& sentence =
-            dev_corpus.sentences.find(sii)->second;
-        const vector<unsigned>& sentencePos =
-            dev_corpus.sentencesPos.find(sii)->second;
-        const vector<unsigned>& actions =
-            dev_corpus.correct_act_sent.find(sii)->second;
+        const vector<unsigned>& sentence = dev_corpus.sentences[sii];
+        const vector<unsigned>& sentencePos = dev_corpus.sentencesPos[sii];
+        const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
         vector<unsigned> tsentence = sentence;
         for (auto& w : tsentence)
           if (training_vocab.count(w) == 0)
@@ -314,13 +308,10 @@ void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab,
   auto t_start = std::chrono::high_resolution_clock::now();
   unsigned corpus_size = corpus.sentences.size();
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
-    const vector<unsigned>& sentence = corpus.sentences.find(sii)->second;
-    const vector<unsigned>& sentencePos =
-        corpus.sentencesPos.find(sii)->second;
-    const vector<string>& sentenceUnkStr =
-        corpus.sentencesSurfaceForms.find(sii)->second;
-    const vector<unsigned>& actions =
-        corpus.correct_act_sent.find(sii)->second;
+    const vector<unsigned>& sentence = corpus.sentences[sii];
+    const vector<unsigned>& sentencePos = corpus.sentencesPos[sii];
+    const vector<string>& sentenceUnkStr = corpus.sentencesSurfaceForms[sii];
+    const vector<unsigned>& actions = corpus.correct_act_sent[sii];
     vector<unsigned> tsentence = sentence;
     for (auto& w : tsentence)
       if (training_vocab.count(w) == 0)
@@ -419,13 +410,13 @@ int main(int argc, char** argv) {
   set<unsigned> singletons;
   {  // compute the singletons in the parser's training data
     map<unsigned, unsigned> counts;
-    for (auto sent : parser.corpus.sentences)
-      for (auto word : sent.second) {
+    for (const auto& sent : parser.corpus.sentences)
+      for (const unsigned word : sent) {
         training_vocab.insert(word);
         counts[word]++;
       }
     if (train) {
-      for (auto wc : counts)
+      for (const auto wc : counts)
         if (wc.second == 1)
           singletons.insert(wc.first);
     }

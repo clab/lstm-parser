@@ -146,6 +146,8 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
           // be a problem if there is little training data.
           cerr << "WARNING: encountered unknown transition in dev/test: "
                << lineS << endl;
+          if (start_of_sentence)
+            correct_act_sent.push_back({});
         }
       }
       start_of_sentence = false;

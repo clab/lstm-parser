@@ -87,7 +87,7 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
             pos_id = vocab->GetOrAddEntry(pos, &vocab->posToInt,
                                           &vocab->intToPos);
             unsigned num_words = vocab->CountWords(); // store for later check
-            word_id = get_or_add_word(word);
+            word_id = vocab->GetOrAddWord(word);
             if (vocab->CountWords() > num_words) {
               // A new word was added; add its chars, too.
               unsigned j = 0;
@@ -104,7 +104,7 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
             // recover the surface form of non-OOV using intToWords(id)).
             // OOV word
             if (USE_SPELLING) {
-              word_id = get_or_add_word(word);
+              word_id = vocab->GetOrAddWord(word);
               current_sent_surface_strs.push_back("");
             } else {
               auto word_iter = vocab->wordsToInt.find(word);

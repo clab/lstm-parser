@@ -150,10 +150,10 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 }
 
 
-void do_train(ParserBuilder* parser, const unsigned unk_strategy,
+void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
+              const cpyp::Corpus& dev_corpus, const unsigned unk_strategy,
               const set<unsigned>& singletons, const double unk_prob,
-              const set<unsigned>& training_vocab, const string& fname,
-              const cpyp::Corpus& dev_corpus) {
+              const set<unsigned>& training_vocab, const string& fname) {
   bool softlinkCreated = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
@@ -162,7 +162,6 @@ void do_train(ParserBuilder* parser, const unsigned unk_strategy,
   //MomentumSGDTrainer sgd(model);
   sgd.eta_decay = 0.08;
   //sgd.eta_decay = 0.05;
-  const cpyp::Corpus& corpus = parser->corpus;
   unsigned num_sentences = corpus.sentences.size();
   vector<unsigned> order(corpus.sentences.size());
   for (unsigned i = 0; i < corpus.sentences.size(); ++i)
@@ -392,23 +391,31 @@ int main(int argc, char** argv) {
     ParserOptions stored_options{};
     *archive_ptr >> stored_options;
     if (stored_options != options) {
+      // TODO: make this recognize the difference between a default option and
+      // one that was actually specified on the command line, and only warn for
+      // the latter.
       cerr << "WARNING: overriding command line network options with stored"
               " options" << endl;
       options = stored_options;
     }
   }
 
-  ParserBuilder parser(conf["training_data"].as<string>(),
-                       conf["words"].as<string>(), options);
+  ParserBuilder parser(conf["words"].as<string>(), move(options), false);
   if (load_model) {
     *archive_ptr >> parser.model;
   }
+  // TODO: make this conditional on whether we load training data (which now we
+  // don't need to).
+  cpyp::Corpus training_corpus(conf["training_data"].as<string>(),
+                               &parser.vocab, true);
+  parser.FinalizeVocab();
 
+  // TODO: should training_vocab be part of the model?
   set<unsigned> training_vocab; // words available in the training corpus
   set<unsigned> singletons;
   {  // compute the singletons in the parser's training data
     map<unsigned, unsigned> counts;
-    for (const auto& sent : parser.corpus.sentences)
+    for (const auto& sent : training_corpus.sentences)
       for (const unsigned word : sent) {
         training_vocab.insert(word);
         counts[word]++;
@@ -420,27 +427,27 @@ int main(int argc, char** argv) {
     }
   }
 
-  cerr << "Total number of words: " << parser.corpus.vocab->CountWords()
+  cerr << "Total number of words: " << training_corpus.vocab->CountWords()
        << endl;
 
   // OOV words will be replaced by UNK tokens
-  cpyp::Corpus dev_corpus(conf["dev_data"].as<string>(), parser.corpus.vocab,
+  cpyp::Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab,
                           false);
   if (train) {
     ostringstream os;
-    os << "parser_" << (options.use_pos ? "pos" : "nopos")
-       << '_' << options.layers
-       << '_' << options.input_dim
-       << '_' << options.hidden_dim
-       << '_' << options.action_dim
-       << '_' << options.lstm_input_dim
-       << '_' << options.pos_dim
-       << '_' << options.rel_dim
+    os << "parser_" << (parser.options.use_pos ? "pos" : "nopos")
+       << '_' << parser.options.layers
+       << '_' << parser.options.input_dim
+       << '_' << parser.options.hidden_dim
+       << '_' << parser.options.action_dim
+       << '_' << parser.options.lstm_input_dim
+       << '_' << parser.options.pos_dim
+       << '_' << parser.options.rel_dim
        << "-pid" << getpid() << ".params";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    do_train(&parser, unk_strategy, singletons, unk_prob, training_vocab,
-             fname, dev_corpus);
+    do_train(&parser, training_corpus, dev_corpus, unk_strategy, singletons,
+             unk_prob, training_vocab, fname);
   }
   if (test) { // do test evaluation
     do_test(&parser, training_vocab, dev_corpus);

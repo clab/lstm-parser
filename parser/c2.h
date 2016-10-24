@@ -40,6 +40,10 @@ public:
   inline unsigned CountChars() { return charsToInt.size(); }
   inline unsigned CountActions() { return actions.size(); }
 
+  inline unsigned GetOrAddWord(const std::string& word) {
+    return GetOrAddEntry(word, &wordsToInt, &intToWords);
+  }
+
 private:
   static inline int AddEntry(const std::string& str, StrToIntMap* map,
                              std::vector<std::string>* indexed_list) {
@@ -81,7 +85,6 @@ public:
 
   ParserVocabulary *vocab;
 
-public:
   Corpus(const std::string& file, ParserVocabulary* vocab, bool is_training) :
       vocab(vocab) {
     load_correct_actions(file, is_training);
@@ -96,10 +99,6 @@ public:
     else if ((x >> 2) == 0x3e) return 5;
     else if ((x >> 1) == 0x7e) return 6;
     else return 0;
-  }
-
-  inline unsigned get_or_add_word(const std::string& word) {
-    return vocab->GetOrAddEntry(word, &vocab->wordsToInt, &vocab->intToWords);
   }
 
 private:

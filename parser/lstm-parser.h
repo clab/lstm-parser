@@ -60,13 +60,10 @@ public:
   const ParserOptions options;
   cnn::Model model;
   cpyp::ParserVocabulary vocab;
-  cpyp::Corpus corpus;
 
-  unsigned vocab_size;
-  unsigned action_size;
-  unsigned pos_size;
+  bool finalized;
   std::unordered_map<unsigned, std::vector<float>> pretrained;
-  size_t n_possible_actions;
+  unsigned n_possible_actions;
   const unsigned kUNK;
   const unsigned kROOT_SYMBOL;
 
@@ -96,9 +93,8 @@ public:
   cnn::Parameters* p_buffer_guard;  // end of buffer
   cnn::Parameters* p_stack_guard;  // end of stack
 
-  explicit ParserBuilder(const std::string& training_path,
-                         const std::string& pretrained_words_path,
-                         const ParserOptions& options);
+  explicit ParserBuilder(const std::string& pretrained_words_path,
+                         const ParserOptions& options, bool finalize=true);
 
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
@@ -150,12 +146,14 @@ public:
       lin >> word;
       for (unsigned i = 0; i < pretrained_dim; ++i)
         lin >> v[i];
-      unsigned id = corpus.get_or_add_word(word);
+      unsigned id = vocab.GetOrAddWord(word);
       pretrained[id] = v;
     }
     assert(num_words == pretrained.size() - 1); // -1 for UNK
     std::cerr << "Loaded " << pretrained.size() - 1 << " words" << std::endl;
   }
+
+  void FinalizeVocab();
 };
 
 #endif // #ifndef LSTM_PARSER_H

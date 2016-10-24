@@ -16,34 +16,15 @@ using namespace std;
 
 constexpr const char* ParserBuilder::ROOT_SYMBOL;
 
-
-ParserBuilder::ParserBuilder(const string& training_path,
-                             const string& pretrained_words_path,
-                             const ParserOptions& options) :
-      options(options),
-      corpus(training_path, &vocab, true),
-      kUNK(corpus.get_or_add_word(vocab.UNK)),
-      kROOT_SYMBOL(corpus.get_or_add_word(ROOT_SYMBOL)),
-      stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
-                 &model),
-      buffer_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
-                  &model),
-      action_lstm(options.layers, options.action_dim, options.hidden_dim,
-                  &model) {
-  // First load words if needed before creating network parameters.
-  // That will ensure that the corpus has the final number of words.
-  if (!pretrained_words_path.empty()) {
-    LoadPretrainedWords(pretrained_words_path);
-  }
-
-  // Now that the corpus is finalized, we can set all the network parameters.
-  action_size = vocab.CountActions() + 1;
-  pos_size = vocab.CountPOS() + 10; // bad way of dealing with the fact that we
-                                    // may see new POS tags in the test set
+void ParserBuilder::FinalizeVocab() {
+  assert (!finalized);
+  // Now that the vocab is finalized, we can set all the network parameters.
+  unsigned action_size = vocab.CountActions() + 1;
+  unsigned pos_size = vocab.CountPOS() + 10; // bad way of dealing with new POS
+  unsigned vocab_size = vocab.CountWords() + 1;
   n_possible_actions = vocab.CountActions();
-  vocab_size = vocab.CountWords() + 1; // needs to be set for p_t
 
-  if (!pretrained_words_path.empty()) {
+  if (!pretrained.empty()) {
     unsigned pretrained_dim = pretrained.begin()->second.size();
     p_t = model.add_lookup_parameters(vocab_size, {pretrained_dim});
     for (auto it : pretrained)
@@ -77,6 +58,29 @@ ParserBuilder::ParserBuilder(const string& training_path,
     p_p = model.add_lookup_parameters(pos_size, {options.pos_dim});
     p_p2l = model.add_parameters({options.lstm_input_dim, options.pos_dim});
   }
+
+  finalized = true;
+}
+
+ParserBuilder::ParserBuilder(const string& pretrained_words_path,
+                             const ParserOptions& poptions, bool finalize) :
+      options(poptions),
+      kUNK(vocab.GetOrAddWord(vocab.UNK)),
+      kROOT_SYMBOL(vocab.GetOrAddWord(ROOT_SYMBOL)),
+      stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
+                 &model),
+      buffer_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
+                  &model),
+      action_lstm(options.layers, options.action_dim, options.hidden_dim,
+                  &model) {
+  // First load words if needed before creating network parameters.
+  // That will ensure that the vocab has the final number of words.
+  if (!pretrained_words_path.empty()) {
+    LoadPretrainedWords(pretrained_words_path);
+  }
+
+  if (finalize)
+    FinalizeVocab();
 }
 
 
@@ -167,6 +171,8 @@ vector<unsigned> ParserBuilder::LogProbParser(
     const vector<unsigned>& sentPos, const vector<unsigned>& correct_actions,
     const vector<string>& setOfActions, const vector<std::string>& intToWords,
     double *right) {
+  assert(finalized);
+
   vector<unsigned> results;
   const bool build_training_graph = correct_actions.size() > 0;
 
@@ -204,7 +210,7 @@ vector<unsigned> ParserBuilder::LogProbParser(
   // precompute buffer representation from left to right
 
   for (unsigned i = 0; i < sent.size(); ++i) {
-    assert(sent[i] < vocab_size);
+    assert(sent[i] < vocab.CountWords());
     Expression w = lookup(*hg, p_w, sent[i]);
 
     vector<Expression> args = {ib, w2l, w}; // learn embeddings

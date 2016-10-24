@@ -27,8 +27,9 @@
 #include "cnn/nodes.h"
 #include "cnn/lstm.h"
 #include "cnn/rnn.h"
+
 #include "c2.h"
-#include "lstm-parse.h"
+#include "lstm-parser.h"
 
 using namespace cnn::expr;
 using namespace cnn;

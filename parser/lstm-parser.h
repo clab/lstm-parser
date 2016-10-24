@@ -1,5 +1,5 @@
-#ifndef LSTM_PARSE_H
-#define LSTM_PARSE_H
+#ifndef LSTM_PARSER_H
+#define LSTM_PARSER_H
 
 #include <unordered_map>
 #include <vector>
@@ -154,4 +154,4 @@ public:
   }
 };
 
-#endif // #ifndef LSTM_PARSE_H
+#endif // #ifndef LSTM_PARSER_H

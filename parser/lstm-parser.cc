@@ -1,3 +1,5 @@
+#include "lstm-parser.h"
+
 #include <cstdlib>
 #include <sstream>
 #include <iostream>
@@ -24,7 +26,6 @@
 #include "cnn/nodes.h"
 #include "cnn/lstm.h"
 #include "cnn/rnn.h"
-#include "lstm-parse.h"
 
 using namespace cnn::expr;
 using namespace cnn;

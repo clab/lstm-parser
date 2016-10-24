@@ -2,6 +2,7 @@
 #define CPYPDICT_H_
 
 #include <string>
+#include <algorithm>
 #include <iostream>
 #include <cassert>
 #include <fstream>

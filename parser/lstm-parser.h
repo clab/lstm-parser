@@ -123,7 +123,7 @@ public:
       const std::vector<std::string>& intToWords, double *right);
 
   void LoadPretrainedWords(const std::string& words_path) {
-    std::cerr << "Loading word std::vectors from " << words_path;
+    std::cerr << "Loading word vectors from " << words_path;
     std::ifstream in(words_path);
 
     // Read header

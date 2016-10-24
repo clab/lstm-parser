@@ -96,10 +96,7 @@ public:
 public:
   Corpus(const std::string& file, ParserVocabulary* vocab, bool is_training) :
       vocab(vocab) {
-    if (is_training)
-      load_correct_actions(file);
-    else
-      load_correct_actionsDev(file);
+    load_correct_actions(file, is_training);
   }
 
 
@@ -118,7 +115,7 @@ public:
   }
 
 private:
-  void load_correct_actions(const std::string& file);
+  void load_correct_actions(const std::string& file, bool is_training);
   void load_correct_actionsDev(const std::string &file);
 
   static inline void ReplaceStringInPlace(std::string& subject,

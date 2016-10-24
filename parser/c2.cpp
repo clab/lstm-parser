@@ -9,7 +9,7 @@ constexpr const char* ParserVocabulary::BAD0;
 
 
 void Corpus::load_correct_actions(const string& file) {
-  cerr << "Loading corpus from " << file << "...";
+  cerr << "Loading corpus from " << file << "..." << endl;
   ifstream actionsFile(file);
   //correct_act_sent=new vector<vector<unsigned>>();
   string lineS;
@@ -135,7 +135,7 @@ void Corpus::load_correct_actions(const string& file) {
 }
 
 void Corpus::load_correct_actionsDev(const string& file) {
-  cerr << "Loading dev corpus from " << file << "...";
+  cerr << "Loading dev corpus from " << file << "..." << endl;
   ifstream actionsFile(file);
   string lineS;
 

@@ -17,8 +17,12 @@ using namespace std;
 constexpr const char* ParserBuilder::ROOT_SYMBOL;
 
 void ParserBuilder::FinalizeVocab() {
-  assert (!finalized);
-  // Now that the vocab is finalized, we can set all the network parameters.
+  // assert (!finalized);
+  if (finalized)
+    return;
+
+  // Now that the vocab is ready to be finalized, we can set all the network
+  // parameters.
   unsigned action_size = vocab.CountActions() + 1;
   unsigned pos_size = vocab.CountPOS() + 10; // bad way of dealing with new POS
   unsigned vocab_size = vocab.CountWords() + 1;
@@ -57,6 +61,9 @@ void ParserBuilder::FinalizeVocab() {
   if (options.use_pos) {
     p_p = model.add_lookup_parameters(pos_size, {options.pos_dim});
     p_p2l = model.add_parameters({options.lstm_input_dim, options.pos_dim});
+  } else {
+    p_p = nullptr;
+    p_p2l = nullptr;
   }
 
   finalized = true;
@@ -79,8 +86,10 @@ ParserBuilder::ParserBuilder(const string& pretrained_words_path,
     LoadPretrainedWords(pretrained_words_path);
   }
 
-  if (finalize)
+  if (finalize) {
     FinalizeVocab();
+  }
+  finalized = finalize;
 }
 
 
@@ -170,9 +179,8 @@ vector<unsigned> ParserBuilder::LogProbParser(
     const vector<unsigned>& sent,  // sentence with oovs replaced
     const vector<unsigned>& sentPos, const vector<unsigned>& correct_actions,
     const vector<string>& setOfActions, const vector<std::string>& intToWords,
-    double *right) {
+    double* right) {
   assert(finalized);
-
   vector<unsigned> results;
   const bool build_training_graph = correct_actions.size() > 0;
 

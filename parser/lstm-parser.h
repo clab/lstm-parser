@@ -39,7 +39,7 @@ struct ParserOptions {
     ar & rel_dim;
   }
 
-  inline bool operator==(const ParserOptions& other) {
+  inline bool operator==(const ParserOptions& other) const {
     return use_pos == other.use_pos && layers == other.layers
         && input_dim == other.input_dim && hidden_dim == other.hidden_dim
         && action_dim == other.action_dim
@@ -120,7 +120,7 @@ public:
       const std::vector<unsigned>& sentPos,
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& setOfActions,
-      const std::vector<std::string>& intToWords, double *right);
+      const std::vector<std::string>& intToWords, double* right);
 
   void LoadPretrainedWords(const std::string& words_path) {
     std::cerr << "Loading word vectors from " << words_path;

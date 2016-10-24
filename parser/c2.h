@@ -103,7 +103,6 @@ public:
 
 private:
   void load_correct_actions(const std::string& file, bool is_training);
-  void load_correct_actionsDev(const std::string &file);
 
   static inline void ReplaceStringInPlace(std::string& subject,
                                           const std::string& search,

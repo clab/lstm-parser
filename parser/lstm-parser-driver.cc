@@ -436,7 +436,8 @@ int main(int argc, char** argv) {
 
   // OOV words will be replaced by UNK tokens
   // TODO: should dev_corpus get its own vocab?
-  cpyp::Corpus dev_corpus(conf["dev_data"].as<string>(), parser.corpus.vocab);
+  cpyp::Corpus dev_corpus(conf["dev_data"].as<string>(), parser.corpus.vocab,
+                          false);
   if (train) {
     ostringstream os;
     os << "parser_" << (options.use_pos ? "pos" : "nopos")

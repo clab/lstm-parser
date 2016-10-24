@@ -39,7 +39,7 @@ ParserBuilder::ParserBuilder(const string& training_path,
                              const string& pretrained_words_path,
                              const ParserOptions& options) :
       options(options),
-      corpus(training_path, &vocab),
+      corpus(training_path, &vocab, true),
       kUNK(corpus.get_or_add_word(vocab.UNK)),
       kROOT_SYMBOL(corpus.get_or_add_word(ROOT_SYMBOL)),
       stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,

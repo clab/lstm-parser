@@ -94,8 +94,12 @@ public:
   ParserVocabulary *vocab;
 
 public:
-  Corpus(const std::string& file, ParserVocabulary* vocab) : vocab(vocab) {
-    load_correct_actions(file);
+  Corpus(const std::string& file, ParserVocabulary* vocab, bool is_training) :
+      vocab(vocab) {
+    if (is_training)
+      load_correct_actions(file);
+    else
+      load_correct_actionsDev(file);
   }
 
 

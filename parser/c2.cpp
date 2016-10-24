@@ -1,6 +1,11 @@
-#include <exception>
-
 #include "c2.h"
+
+#include <algorithm>
+#include <cassert>
+#include <fstream>
+#include <iostream>
+#include <iterator>
+#include <sstream>
 
 using namespace std;
 

@@ -1,19 +1,11 @@
 #ifndef CPYPDICT_H_
 #define CPYPDICT_H_
 
-#include <string>
-#include <algorithm>
-#include <iostream>
-#include <cassert>
-#include <fstream>
-#include <sstream>
-#include <vector>
-#include <set>
-#include <unordered_map>
-#include <functional>
-#include <vector>
+#include <stddef.h>
 #include <map>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace cpyp {
 

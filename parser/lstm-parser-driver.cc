@@ -1,33 +1,31 @@
-#include <cstdlib>
-#include <algorithm>
-#include <sstream>
-#include <iostream>
-#include <vector>
-#include <limits>
-#include <cmath>
-#include <chrono>
-#include <ctime>
-#include <memory>
-#include <utility>
-
-#include <unordered_map>
-#include <unordered_set>
-
-#include <execinfo.h>
-#include <unistd.h>
-#include <signal.h>
-
-#include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
 #include <boost/program_options.hpp>
+#include <signal.h>
+#include <stddef.h>
+#include <unistd.h>
+#include <algorithm>
+#include <cassert>
+#include <chrono>
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <ratio>
+#include <set>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "cnn/training.h"
-#include "cnn/cnn.h"
-#include "cnn/expr.h"
-#include "cnn/nodes.h"
-#include "cnn/lstm.h"
-#include "cnn/rnn.h"
-
+#include "../cnn/cnn/cnn.h"
+#include "../cnn/cnn/init.h"
+#include "../cnn/cnn/model.h"
+#include "../cnn/cnn/tensor.h"
+#include "../cnn/cnn/training.h"
 #include "c2.h"
 #include "lstm-parser.h"
 

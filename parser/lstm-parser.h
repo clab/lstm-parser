@@ -1,6 +1,10 @@
 #ifndef LSTM_PARSER_H
 #define LSTM_PARSER_H
 
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <string>
 #include <unordered_map>
 #include <vector>
 

@@ -1,36 +1,18 @@
 #include "lstm-parser.h"
 
-#include <cstdlib>
-#include <sstream>
-#include <iostream>
-#include <vector>
-#include <limits>
-#include <cmath>
-#include <chrono>
-#include <ctime>
-
+#include <cassert>
+#include <map>
+#include <string>
 #include <unordered_map>
-#include <unordered_set>
+#include <utility>
+#include <vector>
 
-#include <execinfo.h>
-#include <unistd.h>
-#include <signal.h>
-
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/program_options.hpp>
-
-#include "cnn/training.h"
-#include "cnn/cnn.h"
-#include "cnn/expr.h"
-#include "cnn/nodes.h"
-#include "cnn/lstm.h"
-#include "cnn/rnn.h"
+#include "cnn/model.h"
+#include "cnn/tensor.h"
 
 using namespace cnn::expr;
 using namespace cnn;
 using namespace std;
-namespace po = boost::program_options;
 
 constexpr const char* ParserBuilder::ROOT_SYMBOL;
 

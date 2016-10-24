@@ -26,9 +26,5 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 #configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 
 add_subdirectory(cnn/cnn)
-
-set(COMMON_SOURCES parser/lstm-parse.cc)
-set(PARSER_SOURCES parser/lstm-parse-driver.cc)
-
-add_executable(lstm-parser ${COMMON_SOURCES} ${PARSER_SOURCES})
-target_link_libraries(lstm-parser ${LIBS} cnn)
+# add_subdirectory(cnn/examples)
+add_subdirectory(parser)

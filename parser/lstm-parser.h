@@ -26,6 +26,7 @@ struct ParserOptions {
   unsigned lstm_input_dim;
   unsigned pos_dim;
   unsigned rel_dim;
+  unsigned unk_strategy;
 
   template<class Archive>
   void serialize(Archive & ar, const unsigned int version) {
@@ -37,6 +38,7 @@ struct ParserOptions {
     ar & lstm_input_dim;
     ar & pos_dim;
     ar & rel_dim;
+    ar & unk_strategy;
   }
 
   inline bool operator==(const ParserOptions& other) const {
@@ -44,7 +46,7 @@ struct ParserOptions {
         && input_dim == other.input_dim && hidden_dim == other.hidden_dim
         && action_dim == other.action_dim
         && lstm_input_dim == other.lstm_input_dim && pos_dim == other.pos_dim
-        && rel_dim == other.rel_dim;
+        && rel_dim == other.rel_dim && unk_strategy == other.unk_strategy;
   }
 
   inline bool operator!=(const ParserOptions& other) const {
@@ -116,7 +118,7 @@ public:
   std::vector<unsigned> LogProbParser(
       cnn::ComputationGraph* hg,
       const std::vector<unsigned>& raw_sent,  // raw sentence
-      const std::vector<unsigned>& sent,  // w/ oovs replaced
+      const std::vector<unsigned>& sent,  // sentence with OOVs replaced
       const std::vector<unsigned>& sentPos,
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& setOfActions,
@@ -146,7 +148,8 @@ public:
       lin >> word;
       for (unsigned i = 0; i < pretrained_dim; ++i)
         lin >> v[i];
-      unsigned id = vocab.GetOrAddWord(word);
+      // We DON'T yet know this word is present in training data.
+      unsigned id = vocab.GetOrAddWord(word, false);
       pretrained[id] = v;
     }
     assert(num_words == pretrained.size() - 1); // -1 for UNK

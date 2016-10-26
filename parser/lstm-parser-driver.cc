@@ -151,9 +151,8 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 
 
 void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
-              const cpyp::Corpus& dev_corpus, const unsigned unk_strategy,
-              const set<unsigned>& singletons, const double unk_prob,
-              const set<unsigned>& training_vocab, const string& fname) {
+              const cpyp::Corpus& dev_corpus, const double unk_prob,
+              const string& fname) {
   bool softlinkCreated = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
@@ -195,10 +194,10 @@ void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
       }
       tot_seen += 1;
       const vector<unsigned>& sentence = corpus.sentences[order[si]];
-      vector<unsigned> tsentence = sentence;
-      if (unk_strategy == 1) {
+      vector<unsigned> tsentence(sentence);
+      if (parser->options.unk_strategy == 1) {
         for (auto& w : tsentence) {
-          if (singletons.count(w) && cnn::rand01() < unk_prob) {
+          if (corpus.singletons.count(w) && cnn::rand01() < unk_prob) {
             w = parser->kUNK;
           }
         }
@@ -245,14 +244,17 @@ void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
         const vector<unsigned>& sentence = dev_corpus.sentences[sii];
         const vector<unsigned>& sentencePos = dev_corpus.sentencesPos[sii];
         const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
-        vector<unsigned> tsentence = sentence;
-        for (auto& w : tsentence)
-          if (training_vocab.count(w) == 0)
-            w = parser->kUNK;
+        vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
+        for (unsigned& word_id : tsentence) {
+          if (!parser->vocab.intToTrainingWord[word_id]) {
+            word_id = parser->kUNK;
+          }
+        }
         ComputationGraph hg;
         vector<unsigned> pred = parser->LogProbParser(
             &hg, sentence, tsentence, sentencePos, vector<unsigned>(),
             dev_corpus.vocab->actions, dev_corpus.vocab->intToWords, &right);
+
         double lp = 0;
         llh -= lp;
         trs += actions.size();
@@ -293,8 +295,7 @@ void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
 }
 
 
-void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab,
-             const cpyp::Corpus& corpus) {
+void do_test(ParserBuilder* parser, const cpyp::Corpus& corpus) {
   // do test evaluation
   double llh = 0;
   double trs = 0;
@@ -308,10 +309,12 @@ void do_test(ParserBuilder* parser, const set<unsigned>& training_vocab,
     const vector<unsigned>& sentencePos = corpus.sentencesPos[sii];
     const vector<string>& sentenceUnkStr = corpus.sentencesSurfaceForms[sii];
     const vector<unsigned>& actions = corpus.correct_act_sent[sii];
-    vector<unsigned> tsentence = sentence;
-    for (auto& w : tsentence)
-      if (training_vocab.count(w) == 0)
-        w = parser->kUNK;
+    vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
+    for (unsigned& word_id : tsentence) {
+      if (!parser->vocab.intToTrainingWord[word_id]) {
+        word_id = parser->kUNK;
+      }
+    }
     ComputationGraph cg;
     double lp = 0;
     vector<unsigned> pred;
@@ -353,18 +356,9 @@ int main(int argc, char** argv) {
   InitCommandLine(argc, argv, &conf);
 
   // Training options and operation options
-  const unsigned unk_strategy = conf["unk_strategy"].as<unsigned>();
   const double unk_prob = conf["unk_prob"].as<double>();
   const bool train = conf.count("train");
   const bool test = conf.count("test");
-
-  cerr << "Unknown word strategy: ";
-  if (unk_strategy == 1) {
-    cerr << "STOCHASTIC REPLACEMENT\n";
-  } else {
-    abort();
-  }
-  assert(unk_prob >= 0. && unk_prob <= 1.);
 
   ParserOptions cmd_options {
     conf.count("use_pos_tags"),
@@ -374,8 +368,19 @@ int main(int argc, char** argv) {
     conf["action_dim"].as<unsigned>(),
     conf["lstm_input_dim"].as<unsigned>(),
     conf["pos_dim"].as<unsigned>(),
-    conf["rel_dim"].as<unsigned>()
+    conf["rel_dim"].as<unsigned>(),
+    conf["unk_strategy"].as<unsigned>()
   };
+
+  cerr << "Unknown word strategy: ";
+  if (cmd_options.unk_strategy == 1) {
+    cerr << "STOCHASTIC REPLACEMENT\n";
+  } else {
+    cerr << "INVALID SELECTION";
+    abort();
+  }
+  assert(unk_prob >= 0. && unk_prob <= 1.);
+
 
   ParserBuilder parser(conf["words"].as<string>(), cmd_options, false);
   if (conf.count("model")) {
@@ -400,23 +405,6 @@ int main(int argc, char** argv) {
                                &parser.vocab, true);
   parser.FinalizeVocab();
 
-  // TODO: should training_vocab be part of the model?
-  set<unsigned> training_vocab; // words available in the training corpus
-  set<unsigned> singletons;
-  {  // compute the singletons in the parser's training data
-    map<unsigned, unsigned> counts;
-    for (const auto& sent : training_corpus.sentences)
-      for (const unsigned word : sent) {
-        training_vocab.insert(word);
-        counts[word]++;
-      }
-    if (train) {
-      for (const auto wc : counts)
-        if (wc.second == 1)
-          singletons.insert(wc.first);
-    }
-  }
-
   cerr << "Total number of words: " << training_corpus.vocab->CountWords()
        << endl;
 
@@ -436,11 +424,10 @@ int main(int argc, char** argv) {
        << "-pid" << getpid() << ".params";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    do_train(&parser, training_corpus, dev_corpus, unk_strategy, singletons,
-             unk_prob, training_vocab, fname);
+    do_train(&parser, training_corpus, dev_corpus, unk_prob, fname);
   }
   if (test) { // do test evaluation
-    do_test(&parser, training_vocab, dev_corpus);
+    do_test(&parser, dev_corpus);
   }
 
   /*

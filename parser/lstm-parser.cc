@@ -176,10 +176,11 @@ map<int, int> ParserBuilder::ComputeHeads(unsigned sent_len,
 vector<unsigned> ParserBuilder::LogProbParser(
     ComputationGraph* hg,
     const vector<unsigned>& raw_sent,  // raw sentence
-    const vector<unsigned>& sent,  // sentence with oovs replaced
+    const vector<unsigned>& sent,  // sentence with OOVs replaced
     const vector<unsigned>& sentPos, const vector<unsigned>& correct_actions,
     const vector<string>& setOfActions, const vector<std::string>& intToWords,
     double* right) {
+  // TODO: break up this function?
   assert(finalized);
   vector<unsigned> results;
   const bool build_training_graph = correct_actions.size() > 0;
@@ -213,7 +214,8 @@ vector<unsigned> ParserBuilder::LogProbParser(
 
   action_lstm.add_input(action_start);
 
-  vector<Expression> buffer(sent.size() + 1); // variables representing word embeddings (possibly including POS info)
+  // variables representing word embeddings (possibly including POS info)
+  vector<Expression> buffer(sent.size() + 1);
   vector<int> bufferi(sent.size() + 1); // position of the words in the sentence
   // precompute buffer representation from left to right
 

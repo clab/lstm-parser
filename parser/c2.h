@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <iostream>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -22,6 +23,7 @@ public:
 
   StrToIntMap wordsToInt;
   std::vector<std::string> intToWords;
+  std::vector<bool> intToTrainingWord; // Stores whether each word is OOV
 
   StrToIntMap posToInt;
   std::vector<std::string> intToPos;
@@ -31,7 +33,7 @@ public:
 
   std::vector<std::string> actions;
 
-  ParserVocabulary() {
+  ParserVocabulary() : intToTrainingWord({true, true}) {
     AddEntry(BAD0, &wordsToInt, &intToWords);
     AddEntry(UNK, &wordsToInt, &intToWords);
     AddEntry(BAD0, &charsToInt, &intToChars);
@@ -42,22 +44,33 @@ public:
   inline unsigned CountChars() { return charsToInt.size(); }
   inline unsigned CountActions() { return actions.size(); }
 
-  inline unsigned GetOrAddWord(const std::string& word) {
-    return GetOrAddEntry(word, &wordsToInt, &intToWords);
+  inline unsigned GetOrAddWord(const std::string& word,
+                               bool record_as_training=false) {
+    unsigned num_words = CountWords();
+    unsigned word_id = GetOrAddEntry(word, &wordsToInt, &intToWords);
+    if (CountWords() > num_words) { // a word was added
+      intToTrainingWord.push_back(record_as_training);
+    } else {
+      // Should get optimized out when record_as_training is literal false.
+      intToTrainingWord[word_id] = intToTrainingWord[word_id]
+          || record_as_training;
+    }
+    return word_id;
   }
 
 private:
   friend class boost::serialization::access;
 
-  template<class Archive, class ParserType>
+  template<class Archive, class VocabType>
   // Shared code: serialize the number-to-string mappings, from which the
   // reverse mappings can be reconstructed.
   static void serializeLists(Archive& ar, const unsigned int version,
-                             ParserType* parser) {
-    ar & parser->intToWords;
-    ar & parser->intToPos;
-    ar & parser->intToChars;
-    ar & parser->actions;
+                             VocabType* vocab) {
+    ar & vocab->intToWords;
+    ar & vocab->intToPos;
+    ar & vocab->intToChars;
+    ar & vocab->intToTrainingWord;
+    ar & vocab->actions;
   }
 
   template<class Archive>
@@ -102,6 +115,7 @@ private:
 
   static inline unsigned GetOrAddEntry(const std::string& str, StrToIntMap* map,
                                        std::vector<std::string>* indexed_list) {
+    // assert(intToWords.size() == wordsToInt.size());
     auto entry_iter = map->find(str);
     if (entry_iter == map->end()) {
       return AddEntry(str, map, indexed_list);
@@ -122,6 +136,7 @@ public:
   std::vector<std::vector<unsigned>> sentences;
   std::vector<std::vector<unsigned>> sentencesPos;
   std::vector<std::vector<std::string>> sentencesSurfaceForms;
+  std::set<unsigned> singletons;
 
   /*
   std::map<unsigned,unsigned>* headsTraining;
@@ -161,6 +176,8 @@ private:
       pos += replace.length();
     }
   }
+
+  void CountSingletons();
 };
 
 } // namespace

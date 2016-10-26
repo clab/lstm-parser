@@ -14,8 +14,22 @@ namespace cpyp {
 const string ParserVocabulary::UNK = "<UNK>";
 const string ParserVocabulary::BAD0 = "<BAD0>";
 
+void Corpus::CountSingletons() {
+  // compute the singletons in the parser's training data
+  map<unsigned, unsigned> counts;
+  for (const auto& sent : sentences) {
+    for (const unsigned word : sent) {
+      counts[word]++;
+    }
+  }
+  for (const auto wc : counts) {
+    if (wc.second == 1)
+      singletons.insert(wc.first);
+  }
+}
 
 void Corpus::load_correct_actions(const string& file, bool is_training) {
+  // TODO: break up this function?
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;
   ifstream actionsFile(file);
@@ -89,7 +103,7 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
           unsigned word_id;
           if (is_training) {
             unsigned num_words = vocab->CountWords(); // store for later check
-            word_id = vocab->GetOrAddWord(word);
+            word_id = vocab->GetOrAddWord(word, true);
             if (vocab->CountWords() > num_words) {
               // A new word was added; add its chars, too.
               unsigned j = 0;
@@ -100,13 +114,16 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
                                      &vocab->intToChars);
                 j += char_utf8_len;
               }
+            } else {
+              // It's an old word. Make sure it's marked as present in training.
+              vocab->intToTrainingWord[word_id] = true;
             }
           } else {
             // add an empty string for any token except OOVs (it is easy to
             // recover the surface form of non-OOV using intToWords(id)).
             // OOV word
             if (USE_SPELLING) {
-              word_id = vocab->GetOrAddWord(word);
+              word_id = vocab->GetOrAddWord(word); // don't record as training
               current_sent_surface_strs.push_back("");
             } else {
               auto word_iter = vocab->wordsToInt.find(word);
@@ -184,6 +201,11 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
   } else {
     cerr << "# of POS tags: " << vocab->CountPOS() << "\n";
   }
+
+  if (is_training) {  // compute the singletons in the parser's training data
+    CountSingletons();
+  }
+
 }
 
 } // namespace cpyp

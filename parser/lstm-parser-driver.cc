@@ -1,5 +1,10 @@
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/program_options.hpp>
 #include <signal.h>
 #include <stddef.h>
@@ -33,6 +38,7 @@ using namespace cnn::expr;
 using namespace cnn;
 using namespace std;
 namespace po = boost::program_options;
+namespace io = boost::iostreams;
 
 volatile bool requested_stop = false;
 
@@ -47,7 +53,8 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
          " unk_prob")
         ("unk_prob,u", po::value<double>()->default_value(0.2),
          "Probably with which to replace singletons with UNK in training data")
-        ("model,m", po::value<string>(), "Load saved model from this file")
+         ("model,m", po::value<string>(), "Load saved model from this file")
+         ("compress,c", "Whether to compress the model when saving")
         ("use_pos_tags,P", "make POS tags visible to parser")
         ("layers,l", po::value<unsigned>()->default_value(2),
          "number of LSTM layers")
@@ -62,8 +69,8 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
          "relation dimension")
         ("lstm_input_dim", po::value<unsigned>()->default_value(60),
          "LSTM input dimension")
-        ("train,t", "Should training be run?")
-        ("test,e", "Should the model be tested on dev data?")
+        ("train,t", "Whether training should be run")
+        ("test,e", "Whether the model should be tested on dev data")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
         ("help,h", "Help");
   po::options_description dcmdline_options;
@@ -152,7 +159,7 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 
 void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
               const cpyp::Corpus& dev_corpus, const double unk_prob,
-              const string& fname) {
+              const string& fname, bool compress) {
   bool softlinkCreated = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
@@ -274,13 +281,23 @@ void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
            << " ms]" << endl;
       if (correct_heads > best_correct_heads) {
         best_correct_heads = correct_heads;
-        ofstream out(fname);
-        boost::archive::text_oarchive oa(out);
-        oa << *parser;
+        ofstream out_file(fname);
+        if (compress) {
+          io::filtering_streambuf<io::output> filter;
+          filter.push(io::gzip_compressor());
+          filter.push(out_file);
+          boost::archive::binary_oarchive oa(filter);
+          oa << *parser;
+        } else {
+          boost::archive::text_oarchive oa(out_file);
+          oa << *parser;
+        }
         // Create a soft link to the most recent model in order to make it
         // easier to refer to it in a shell script.
         if (!softlinkCreated) {
           string softlink = "latest_model.params";
+          if (compress)
+            softlink += ".gz";
           if (system((string("rm -f ") + softlink).c_str()) == 0
               && system((string("ln -s ") + fname + " " + softlink).c_str())
                   == 0) {
@@ -359,6 +376,7 @@ int main(int argc, char** argv) {
   const double unk_prob = conf["unk_prob"].as<double>();
   const bool train = conf.count("train");
   const bool test = conf.count("test");
+  const bool compress = conf.count("compress");
 
   ParserOptions cmd_options {
     conf.count("use_pos_tags"),
@@ -386,9 +404,19 @@ int main(int argc, char** argv) {
   if (conf.count("model")) {
     const string& model_path = conf["model"].as<string>();
     cerr << "Loading model from " << model_path << endl;
-    ifstream model_stream(model_path.c_str());
-    boost::archive::text_iarchive archive(model_stream);
-    archive >> parser;
+    if (boost::algorithm::ends_with(model_path, ".gz")) {
+      // It's a compressed stream.
+      ifstream model_stream(model_path.c_str());
+      io::filtering_streambuf<io::input> filter;
+      filter.push(io::gzip_decompressor());
+      filter.push(model_stream);
+      boost::archive::binary_iarchive archive(filter);
+      archive >> parser;
+    } else {
+      ifstream model_stream(model_path.c_str());
+      boost::archive::text_iarchive archive(model_stream);
+      archive >> parser;
+    }
 
     if (parser.options != cmd_options) {
       // TODO: make this recognize the difference between a default option and
@@ -422,9 +450,11 @@ int main(int argc, char** argv) {
        << '_' << parser.options.pos_dim
        << '_' << parser.options.rel_dim
        << "-pid" << getpid() << ".params";
+    if (compress)
+      os << ".gz";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    do_train(&parser, training_corpus, dev_corpus, unk_prob, fname);
+    do_train(&parser, training_corpus, dev_corpus, unk_prob, fname, compress);
   }
   if (test) { // do test evaluation
     do_test(&parser, dev_corpus);

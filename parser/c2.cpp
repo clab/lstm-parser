@@ -75,17 +75,19 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
           // split the string (at '-') into word and POS tag.
           size_t posIndex = word.rfind('-');
           if (posIndex == string::npos) {
-            cerr << "cant find the dash in '" << word << "'"
+            cerr << "can't find the dash in '" << word << "'"
                  << endl;
           }
           assert(posIndex != string::npos);
           string pos = word.substr(posIndex + 1);
           word = word.substr(0, posIndex);
 
-          unsigned word_id, pos_id;
+          // We assume that we'll have seen all POS tags in training, so don't
+          // worry about OOV tags.
+          unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->posToInt,
+                                                 &vocab->intToPos);
+          unsigned word_id;
           if (is_training) {
-            pos_id = vocab->GetOrAddEntry(pos, &vocab->posToInt,
-                                          &vocab->intToPos);
             unsigned num_words = vocab->CountWords(); // store for later check
             word_id = vocab->GetOrAddWord(word);
             if (vocab->CountWords() > num_words) {

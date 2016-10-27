@@ -48,14 +48,15 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   opts.add_options()
         ("training_data,T", po::value<string>(),
          "List of transitions - training corpus")
-        ("dev_data,d", po::value<string>(), "Development corpus")
+        ("dev_data,d", po::value<string>(), "Development corpus path")
+        ("test_data,d", po::value<string>(), "Test corpus path")
         ("unk_strategy,o", po::value<unsigned>()->default_value(1),
          "Unknown word strategy: 1 = singletons become UNK with probability"
          " unk_prob")
         ("unk_prob,u", po::value<double>()->default_value(0.2),
          "Probably with which to replace singletons with UNK in training data")
-         ("model,m", po::value<string>(), "Load saved model from this file")
-         ("compress,c", "Whether to compress the model when saving")
+        ("model,m", po::value<string>(), "Load saved model from this file")
+        ("compress,c", "Whether to compress the model when saving")
         ("use_pos_tags,P", "make POS tags visible to parser")
         ("layers,l", po::value<unsigned>()->default_value(2),
          "number of LSTM layers")
@@ -71,7 +72,8 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
         ("lstm_input_dim", po::value<unsigned>()->default_value(60),
          "LSTM input dimension")
         ("train,t", "Whether training should be run")
-        ("test,e", "Whether the model should be tested on dev data")
+        ("test,e", "Whether the model should be tested."
+                   " If train is true, this tests on dev data.")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
         ("help,h", "Help");
   po::options_description dcmdline_options;
@@ -378,6 +380,7 @@ int main(int argc, char** argv) {
   const bool train = conf.count("train");
   const bool test = conf.count("test");
   const bool compress = conf.count("compress");
+  const bool load_model = conf.count("model");
 
   ParserOptions cmd_options {
     conf.count("use_pos_tags"),
@@ -398,11 +401,18 @@ int main(int argc, char** argv) {
     cerr << "INVALID SELECTION";
     abort();
   }
-  assert(unk_prob >= 0. && unk_prob <= 1.);
-
+  if (unk_prob < 0. || unk_prob > 1.) {
+    cerr << "Invalid unknown word substitution probability: " << unk_prob;
+    abort();
+  }
+  // If we're testing, we have to either be loading or training a model.
+  if (test && !load_model && !train) {
+    cerr << "No model specified for testing!";
+    abort();
+  }
 
   ParserBuilder parser(conf["words"].as<string>(), cmd_options, false);
-  if (conf.count("model")) {
+  if (load_model) {
     const string& model_path = conf["model"].as<string>();
     cerr << "Loading model from " << model_path << endl;
     if (boost::algorithm::ends_with(model_path, ".gz")) {
@@ -428,18 +438,15 @@ int main(int argc, char** argv) {
     }
   }
 
-  // TODO: make this conditional on whether we load training data (which now we
-  // don't need to).
-  Corpus training_corpus(conf["training_data"].as<string>(),
-                         &parser.vocab, true);
-  parser.FinalizeVocab();
-
-  cerr << "Total number of words: " << training_corpus.vocab->CountWords()
-       << endl;
-
-  // OOV words will be replaced by UNK tokens
-  Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab, false);
   if (train) {
+    Corpus training_corpus(conf["training_data"].as<string>(),
+                           &parser.vocab, true);
+    parser.FinalizeVocab();
+    cerr << "Total number of words: " << training_corpus.vocab->CountWords()
+         << endl;
+    // OOV words will be replaced by UNK tokens
+    Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab, false);
+
     ostringstream os;
     os << "parser_" << (parser.options.use_pos ? "pos" : "nopos")
        << '_' << parser.options.layers
@@ -455,9 +462,14 @@ int main(int argc, char** argv) {
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
     do_train(&parser, training_corpus, dev_corpus, unk_prob, fname, compress);
+
+    if (test) { // do test evaluation
+      do_test(&parser, dev_corpus);
+    }
   }
-  if (test) { // do test evaluation
-    do_test(&parser, dev_corpus);
+  else if (test) { // actually run the parser
+    cerr << "Testing on non-oracle data is not yet implemented!";
+    abort();
   }
 
   /*

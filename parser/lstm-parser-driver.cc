@@ -31,12 +31,13 @@
 #include "../cnn/cnn/model.h"
 #include "../cnn/cnn/tensor.h"
 #include "../cnn/cnn/training.h"
-#include "c2.h"
+#include "corpus.h"
 #include "lstm-parser.h"
 
 using namespace cnn::expr;
 using namespace cnn;
 using namespace std;
+using namespace lstm_parser;
 namespace po = boost::program_options;
 namespace io = boost::iostreams;
 
@@ -123,7 +124,7 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
   for (unsigned i = 0; i < (sentence.size() - 1); ++i) {
     auto index = i + 1;
     const unsigned int unk_word =
-        wordsToInt.find(cpyp::ParserVocabulary::UNK)->second;
+        wordsToInt.find(CorpusVocabulary::UNK)->second;
     assert(i < sentenceUnkStrings.size() &&
            ((sentence[i] == unk_word && sentenceUnkStrings[i].size() > 0) ||
             (sentence[i] != unk_word && sentenceUnkStrings[i].size() == 0 &&
@@ -157,8 +158,8 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 }
 
 
-void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
-              const cpyp::Corpus& dev_corpus, const double unk_prob,
+void do_train(ParserBuilder* parser, const Corpus& corpus,
+              const Corpus& dev_corpus, const double unk_prob,
               const string& fname, bool compress) {
   bool softlinkCreated = false;
   int best_correct_heads = 0;
@@ -312,7 +313,7 @@ void do_train(ParserBuilder* parser, const cpyp::Corpus& corpus,
 }
 
 
-void do_test(ParserBuilder* parser, const cpyp::Corpus& corpus) {
+void do_test(ParserBuilder* parser, const Corpus& corpus) {
   // do test evaluation
   double llh = 0;
   double trs = 0;
@@ -429,16 +430,15 @@ int main(int argc, char** argv) {
 
   // TODO: make this conditional on whether we load training data (which now we
   // don't need to).
-  cpyp::Corpus training_corpus(conf["training_data"].as<string>(),
-                               &parser.vocab, true);
+  Corpus training_corpus(conf["training_data"].as<string>(),
+                         &parser.vocab, true);
   parser.FinalizeVocab();
 
   cerr << "Total number of words: " << training_corpus.vocab->CountWords()
        << endl;
 
   // OOV words will be replaced by UNK tokens
-  cpyp::Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab,
-                          false);
+  Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab, false);
   if (train) {
     ostringstream os;
     os << "parser_" << (parser.options.use_pos ? "pos" : "nopos")

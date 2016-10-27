@@ -14,6 +14,8 @@ using namespace cnn::expr;
 using namespace cnn;
 using namespace std;
 
+namespace lstm_parser {
+
 constexpr const char* ParserBuilder::ROOT_SYMBOL;
 
 void ParserBuilder::FinalizeVocab() {
@@ -373,3 +375,5 @@ vector<unsigned> ParserBuilder::LogProbParser(
   assert(tot_neglogprob.pg != nullptr);
   return results;
 }
+
+} // namespace lstm_parser

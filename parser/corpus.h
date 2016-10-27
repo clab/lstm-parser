@@ -1,5 +1,5 @@
-#ifndef CPYPDICT_H_
-#define CPYPDICT_H_
+#ifndef CORPUS_H
+#define CORPUS_H
 
 #include <boost/serialization/split_member.hpp>
 #include <stddef.h>
@@ -10,9 +10,9 @@
 #include <utility>
 #include <vector>
 
-namespace cpyp {
+namespace lstm_parser {
 
-class ParserVocabulary {
+class CorpusVocabulary {
   friend class Corpus;
 public:
   typedef std::map<std::string, unsigned> StrToIntMap;
@@ -33,7 +33,7 @@ public:
 
   std::vector<std::string> actions;
 
-  ParserVocabulary() : intToTrainingWord({true, true}) {
+  CorpusVocabulary() : intToTrainingWord({true, true}) {
     AddEntry(BAD0, &wordsToInt, &intToWords);
     AddEntry(UNK, &wordsToInt, &intToWords);
     AddEntry(BAD0, &charsToInt, &intToChars);
@@ -146,9 +146,9 @@ public:
   std::map<unsigned,std::string>* labelsParsing;
   //*/
 
-  ParserVocabulary *vocab;
+  CorpusVocabulary *vocab;
 
-  Corpus(const std::string& file, ParserVocabulary* vocab, bool is_training) :
+  Corpus(const std::string& file, CorpusVocabulary* vocab, bool is_training) :
       vocab(vocab) {
     load_correct_actions(file, is_training);
   }
@@ -180,6 +180,6 @@ private:
   void CountSingletons();
 };
 
-} // namespace
+} // namespace lstm_parser
 
 #endif

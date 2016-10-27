@@ -14,8 +14,10 @@
 #include "cnn/nodes.h"
 #include "cnn/lstm.h"
 #include "cnn/rnn.h"
-#include "c2.h"
+#include "corpus.h"
 
+
+namespace lstm_parser {
 
 struct ParserOptions {
   bool use_pos;
@@ -60,7 +62,7 @@ public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
   ParserOptions options;
-  cpyp::ParserVocabulary vocab;
+  CorpusVocabulary vocab;
   cnn::Model model;
 
   bool finalized;
@@ -168,5 +170,7 @@ private:
     ar & model;
   }
 };
+
+} // namespace lstm_parser
 
 #endif // #ifndef LSTM_PARSER_H

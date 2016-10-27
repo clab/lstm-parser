@@ -1,4 +1,4 @@
-#include "c2.h"
+#include "corpus.h"
 
 #include <algorithm>
 #include <cassert>
@@ -9,10 +9,10 @@
 
 using namespace std;
 
-namespace cpyp {
+namespace lstm_parser {
 
-const string ParserVocabulary::UNK = "<UNK>";
-const string ParserVocabulary::BAD0 = "<BAD0>";
+const string CorpusVocabulary::UNK = "<UNK>";
+const string CorpusVocabulary::BAD0 = "<BAD0>";
 
 void Corpus::CountSingletons() {
   // compute the singletons in the parser's training data
@@ -208,4 +208,4 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
 
 }
 
-} // namespace cpyp
+} // namespace lstm_parser

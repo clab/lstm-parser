@@ -127,8 +127,10 @@ private:
 
 
 class Corpus {
-  //typedef std::unordered_map<std::string, unsigned, std::hash<std::string> > Map;
-  // typedef std::unordered_map<unsigned,std::string, std::hash<std::string> > ReverseMap;
+  // typedef std::unordered_map<std::string, unsigned,
+  //                            std::hash<std::string> > Map;
+  // typedef std::unordered_map<unsigned, std::string,
+  //                            std::hash<std::string> > ReverseMap;
 public:
   bool USE_SPELLING = false;
 

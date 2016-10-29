@@ -58,7 +58,7 @@ struct ParserOptions {
 };
 
 
-class ParserBuilder { // TODO: rename
+class LSTMParser {
 public:
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
@@ -98,7 +98,7 @@ public:
   cnn::Parameters* p_buffer_guard;  // end of buffer
   cnn::Parameters* p_stack_guard;  // end of stack
 
-  explicit ParserBuilder(const ParserOptions& options,
+  explicit LSTMParser(const ParserOptions& options,
                          const std::string& pretrained_words_path,
                          bool finalize=true);
 

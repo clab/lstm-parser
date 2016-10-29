@@ -16,9 +16,9 @@ using namespace std;
 
 namespace lstm_parser {
 
-constexpr const char* ParserBuilder::ROOT_SYMBOL;
+constexpr const char* LSTMParser::ROOT_SYMBOL;
 
-void ParserBuilder::FinalizeVocab() {
+void LSTMParser::FinalizeVocab() {
   // assert (!finalized);
   if (finalized)
     return;
@@ -71,7 +71,7 @@ void ParserBuilder::FinalizeVocab() {
   finalized = true;
 }
 
-ParserBuilder::ParserBuilder(const ParserOptions& poptions,
+LSTMParser::LSTMParser(const ParserOptions& poptions,
                              const string& pretrained_words_path,
                              bool finalize) :
       options(poptions),
@@ -96,7 +96,7 @@ ParserBuilder::ParserBuilder(const ParserOptions& poptions,
 }
 
 
-bool ParserBuilder::IsActionForbidden(const string& a, unsigned bsize,
+bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
                                       unsigned ssize,
                                       const vector<int>& stacki) {
   if (a[1] == 'W' && ssize < 3)
@@ -125,7 +125,7 @@ bool ParserBuilder::IsActionForbidden(const string& a, unsigned bsize,
 }
 
 
-map<int, int> ParserBuilder::ComputeHeads(unsigned sent_len,
+map<int, int> LSTMParser::ComputeHeads(unsigned sent_len,
                                           const vector<unsigned>& actions,
                                           const vector<string>& setOfActions,
                                           map<int, string>* pr) {
@@ -176,7 +176,7 @@ map<int, int> ParserBuilder::ComputeHeads(unsigned sent_len,
 }
 
 
-vector<unsigned> ParserBuilder::LogProbParser(
+vector<unsigned> LSTMParser::LogProbParser(
     ComputationGraph* hg,
     const vector<unsigned>& raw_sent,  // raw sentence
     const vector<unsigned>& sent,  // sentence with OOVs replaced
@@ -232,7 +232,7 @@ vector<unsigned> ParserBuilder::LogProbParser(
       args.push_back(p2l);
       args.push_back(p);
     }
-    if (p_t && pretrained.count(raw_sent[i])) { // include fixed pretrained vectors?
+    if (p_t && pretrained.count(raw_sent[i])) { // include pretrained vectors?
       Expression t = const_lookup(*hg, p_t, raw_sent[i]);
       args.push_back(t2l);
       args.push_back(t);
@@ -285,7 +285,8 @@ vector<unsigned> ParserBuilder::LogProbParser(
       }
     }
     unsigned action = best_a;
-    if (build_training_graph) { // if we have reference actions (for training) use the reference action
+    // If we have reference actions (for training), use the reference action.
+    if (build_training_graph) {
       action = correct_actions[action_count];
       if (best_a == action) {
         (*right)++;
@@ -299,7 +300,7 @@ vector<unsigned> ParserBuilder::LogProbParser(
     Expression actione = lookup(*hg, p_a, action);
     action_lstm.add_input(actione);
 
-    // get relation embedding from action (TODO: convert to relation from action?)
+    // get relation embedding from action (TODO: convert to rel from action?)
     Expression relation = lookup(*hg, p_r, action);
 
     // do action

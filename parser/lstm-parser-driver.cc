@@ -160,7 +160,7 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
 }
 
 
-void do_train(ParserBuilder* parser, const Corpus& corpus,
+void do_train(LSTMParser* parser, const Corpus& corpus,
               const Corpus& dev_corpus, const double unk_prob,
               const string& fname, bool compress) {
   bool softlinkCreated = false;
@@ -316,7 +316,7 @@ void do_train(ParserBuilder* parser, const Corpus& corpus,
 }
 
 
-void do_test(ParserBuilder* parser, const Corpus& corpus) {
+void do_test(LSTMParser* parser, const Corpus& corpus) {
   // do test evaluation
   double llh = 0;
   double trs = 0;
@@ -414,7 +414,7 @@ int main(int argc, char** argv) {
   }
 
   const string words = load_model ? "" : conf["words"].as<string>();
-  ParserBuilder parser(cmd_options, words, false);
+  LSTMParser parser(cmd_options, words, false);
   if (load_model) {
     const string& model_path = conf["model"].as<string>();
     cerr << "Loading model from " << model_path << endl;

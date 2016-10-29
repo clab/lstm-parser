@@ -295,6 +295,7 @@ void do_train(ParserBuilder* parser, const Corpus& corpus,
           boost::archive::text_oarchive oa(out_file);
           oa << *parser;
         }
+        cerr << "Model saved." << endl;
         // Create a soft link to the most recent model in order to make it
         // easier to refer to it in a shell script.
         if (!softlinkCreated) {
@@ -398,16 +399,17 @@ int main(int argc, char** argv) {
   if (cmd_options.unk_strategy == 1) {
     cerr << "STOCHASTIC REPLACEMENT\n";
   } else {
-    cerr << "INVALID SELECTION";
+    cerr << "INVALID SELECTION" << endl;
     abort();
   }
   if (unk_prob < 0. || unk_prob > 1.) {
-    cerr << "Invalid unknown word substitution probability: " << unk_prob;
+    cerr << "Invalid unknown word substitution probability: " << unk_prob
+         << endl;
     abort();
   }
   // If we're testing, we have to either be loading or training a model.
   if (test && !load_model && !train) {
-    cerr << "No model specified for testing!";
+    cerr << "No model specified for testing!" << endl;
     abort();
   }
 
@@ -468,8 +470,11 @@ int main(int argc, char** argv) {
     }
   }
   else if (test) { // actually run the parser
-    cerr << "Testing on non-oracle data is not yet implemented!";
-    abort();
+    // TODO: make this run parser on test data.
+    parser.FinalizeVocab();
+    Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab, false);
+    do_test(&parser, dev_corpus);
+
   }
 
   /*

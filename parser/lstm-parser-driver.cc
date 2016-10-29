@@ -46,10 +46,10 @@ volatile bool requested_stop = false;
 void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   po::options_description opts("Configuration options");
   opts.add_options()
-        ("training_data,T", po::value<string>(),
+        ("training_data,t", po::value<string>(),
          "List of transitions - training corpus")
         ("dev_data,d", po::value<string>(), "Development corpus path")
-        ("test_data,d", po::value<string>(), "Test corpus path")
+        ("test_data,T", po::value<string>(), "Test corpus path")
         ("unk_strategy,o", po::value<unsigned>()->default_value(1),
          "Unknown word strategy: 1 = singletons become UNK with probability"
          " unk_prob")
@@ -71,7 +71,7 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
          "relation dimension")
         ("lstm_input_dim", po::value<unsigned>()->default_value(60),
          "LSTM input dimension")
-        ("train,t", "Whether training should be run")
+        ("train,r", "Whether training should be run")
         ("test,e", "Whether the model should be tested."
                    " If train is true, this tests on dev data.")
         ("words,w", po::value<string>(), "Pretrained word embeddings")

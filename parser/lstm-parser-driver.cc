@@ -413,7 +413,8 @@ int main(int argc, char** argv) {
     abort();
   }
 
-  ParserBuilder parser(conf["words"].as<string>(), cmd_options, false);
+  const string words = load_model ? "" : conf["words"].as<string>();
+  ParserBuilder parser(cmd_options, words, false);
   if (load_model) {
     const string& model_path = conf["model"].as<string>();
     cerr << "Loading model from " << model_path << endl;

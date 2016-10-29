@@ -71,8 +71,9 @@ void ParserBuilder::FinalizeVocab() {
   finalized = true;
 }
 
-ParserBuilder::ParserBuilder(const string& pretrained_words_path,
-                             const ParserOptions& poptions, bool finalize) :
+ParserBuilder::ParserBuilder(const ParserOptions& poptions,
+                             const string& pretrained_words_path,
+                             bool finalize) :
       options(poptions),
       kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(ROOT_SYMBOL)),

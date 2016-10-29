@@ -1,6 +1,7 @@
 #ifndef LSTM_PARSER_H
 #define LSTM_PARSER_H
 
+#include <boost/serialization/unordered_map.hpp>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -97,8 +98,9 @@ public:
   cnn::Parameters* p_buffer_guard;  // end of buffer
   cnn::Parameters* p_stack_guard;  // end of stack
 
-  explicit ParserBuilder(const std::string& pretrained_words_path,
-                         const ParserOptions& options, bool finalize=true);
+  explicit ParserBuilder(const ParserOptions& options,
+                         const std::string& pretrained_words_path,
+                         bool finalize=true);
 
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
@@ -166,7 +168,8 @@ private:
   void serialize(Archive & ar, const unsigned int version) {
     ar & options;
     ar & vocab;
-    FinalizeVocab(); // finalize *after* vocab to make load work
+    ar & pretrained;
+    FinalizeVocab(); // finalize *after* vocab & pretrained to make load work
     ar & model;
   }
 };

@@ -112,6 +112,12 @@ public:
       const std::vector<std::string>& setOfActions,
       std::map<int, std::string>* pr = nullptr);
 
+  void Train(const Corpus& corpus, const Corpus& dev_corpus,
+             const double unk_prob, const std::string& model_fname,
+             bool compress, const volatile bool* requested_stop=nullptr);
+
+  void Test(const Corpus& corpus);
+
   // *** if correct_actions is empty, this runs greedy decoding ***
   // returns parse actions for input sentence (in training just returns the
   // reference)
@@ -162,6 +168,24 @@ public:
 
   void FinalizeVocab();
 
+protected:
+  void SaveModel(const std::string& model_fname, bool compress,
+                 bool softlinkCreated);
+
+  unsigned ComputeCorrect(const std::map<int, int>& ref,
+                          const std::map<int, int>& hyp, unsigned len) const {
+    unsigned res = 0;
+    for (unsigned i = 0; i < len; ++i) {
+      auto ri = ref.find(i);
+      auto hi = hyp.find(i);
+      assert(ri != ref.end());
+      assert(hi != hyp.end());
+      if (ri->second == hi->second)
+        ++res;
+    }
+    return res;
+  }
+
 private:
   friend class boost::serialization::access;
   template<class Archive>
@@ -172,6 +196,15 @@ private:
     FinalizeVocab(); // finalize *after* vocab & pretrained to make load work
     ar & model;
   }
+
+  static void OutputConll(const std::vector<unsigned>& sentence,
+                          const std::vector<unsigned>& pos,
+                          const std::vector<std::string>& sentenceUnkStrings,
+                          const std::vector<std::string>& intToWords,
+                          const std::vector<std::string>& intToPos,
+                          const std::map<std::string, unsigned>& wordsToInt,
+                          const std::map<int, int>& hyp,
+                          const std::map<int, std::string>& rel_hyp);
 };
 
 } // namespace lstm_parser

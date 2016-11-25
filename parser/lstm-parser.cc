@@ -192,7 +192,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     const vector<unsigned>& sent,  // sentence with OOVs replaced
     const vector<unsigned>& sentPos, const vector<unsigned>& correct_actions,
     const vector<string>& setOfActions, const vector<std::string>& intToWords,
-    double* right) {
+    double* correct) {
   // TODO: break up this function?
   assert(finalized);
   vector<unsigned> results;
@@ -299,7 +299,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     if (build_training_graph) {
       action = correct_actions[action_count];
       if (best_a == action) {
-        (*right)++;
+        (*correct)++;
       }
     }
     ++action_count;
@@ -437,7 +437,7 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
   status_every_i_iterations = min(status_every_i_iterations, num_sentences);
   cerr << "NUMBER OF TRAINING SENTENCES: " << num_sentences << endl;
   unsigned trs = 0;
-  double right = 0;
+  double correct = 0;
   double llh = 0;
   bool first = true;
   int iter = -1;
@@ -474,7 +474,7 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
       const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
       ComputationGraph hg;
       LogProbParser(&hg, sentence, tsentence, sentencePos, actions,
-                    corpus.vocab->actions, corpus.vocab->intToWords, &right);
+                    corpus.vocab->actions, corpus.vocab->intToWords, &correct);
       double lp = as_scalar(hg.incremental_forward());
       if (lp < 0) {
         cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp
@@ -492,9 +492,9 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
         std::chrono::system_clock::now());
     cerr << "update #" << iter << " (epoch " << (tot_seen / num_sentences)
          << " |time=" << put_time(localtime(&time_now), "%c %Z") << ")\tllh: "
-         << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs
+         << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - correct) / trs
          << endl;
-    llh = trs = right = 0;
+    llh = trs = correct = 0;
     static int logc = 0;
     ++logc;
     if (logc % 25 == 1) {
@@ -503,7 +503,7 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
       // dev_size = 100;
       double llh = 0;
       double trs = 0;
-      double right = 0;
+      double correct = 0;
       double correct_heads = 0;
       double total_heads = 0;
       auto t_start = std::chrono::high_resolution_clock::now();
@@ -522,7 +522,7 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
                                               sentencePos, vector<unsigned>(),
                                               dev_corpus.vocab->actions,
                                               dev_corpus.vocab->intToWords,
-                                              &right);
+                                              &correct);
 
         double lp = 0;
         llh -= lp;
@@ -537,7 +537,7 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
       auto t_end = std::chrono::high_resolution_clock::now();
       cerr << "  **dev (iter=" << iter << " epoch="
            << (tot_seen / num_sentences) << ")\tllh=" << llh << " ppl: "
-           << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: "
+           << exp(llh / trs) << " err: " << (trs - correct) / trs << " uas: "
            << (correct_heads / total_heads) << "\t[" << dev_size << " sents in "
            << std::chrono::duration<double, std::milli>(t_end - t_start).count()
            << " ms]" << endl;
@@ -555,7 +555,7 @@ void LSTMParser::Test(const Corpus& corpus) {
   // do test evaluation
   double llh = 0;
   double trs = 0;
-  double right = 0;
+  double correct = 0;
   double correct_heads = 0;
   double total_heads = 0;
   auto t_start = std::chrono::high_resolution_clock::now();
@@ -576,7 +576,7 @@ void LSTMParser::Test(const Corpus& corpus) {
     vector<unsigned> pred;
     pred = LogProbParser(&cg, sentence, tsentence, sentencePos,
                          vector<unsigned>(), corpus.vocab->actions,
-                         corpus.vocab->intToWords, &right);
+                         corpus.vocab->intToWords, &correct);
     llh -= lp;
     trs += actions.size();
     map<int, string> rel_ref;
@@ -593,7 +593,7 @@ void LSTMParser::Test(const Corpus& corpus) {
   }
   auto t_end = std::chrono::high_resolution_clock::now();
   cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: "
-       << (trs - right) / trs << " uas: " << (correct_heads / total_heads)
+       << (trs - correct) / trs << " uas: " << (correct_heads / total_heads)
        << "\t[" << corpus_size << " sents in "
        << std::chrono::duration<double, std::milli>(t_end - t_start).count()
        << " ms]" << endl;

@@ -60,6 +60,7 @@ struct ParserOptions {
 
 class LSTMParser {
 public:
+  // TODO: make some of these members non-public
   static constexpr const char* ROOT_SYMBOL = "ROOT";
 
   ParserOptions options;

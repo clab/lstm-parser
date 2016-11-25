@@ -138,13 +138,12 @@ bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
 map<int, int> LSTMParser::ComputeHeads(unsigned sent_len,
                                           const vector<unsigned>& actions,
                                           const vector<string>& setOfActions,
-                                          map<int, string>* pr) {
+                                          map<int, string>* rels) {
   map<int, int> heads;
-  map<int, string> r;
-  map<int, string>& rels = (pr ? *pr : r);
   for (unsigned i = 0; i < sent_len; i++) {
     heads[i] = -1;
-    rels[i] = "ERROR";
+    if (rels)
+        (*rels)[i] = "ERROR";
   }
   vector<int> bufferi(sent_len + 1, 0), stacki(1, -999);
   for (unsigned i = 0; i < sent_len; ++i)
@@ -177,7 +176,8 @@ map<int, int> LSTMParser::ComputeHeads(unsigned sent_len,
       stacki.pop_back();
       stacki.push_back(headi);
       heads[depi] = headi;
-      rels[depi] = actionString;
+      if (rels)
+          (*rels)[depi] = actionString;
     }
   }
   assert(bufferi.size() == 1);

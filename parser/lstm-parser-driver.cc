@@ -84,7 +84,7 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
     exit(1);
   }
   if (conf->count("training_data") == 0) {
-    cerr << "Please specify --training_data (-T): this is required to determine"
+    cerr << "Please specify --training_data (-t): this is required to determine"
             " the vocabulary mapping, even if the parser is used in prediction"
             " mode.\n";
     exit(1);

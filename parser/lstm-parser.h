@@ -135,37 +135,7 @@ public:
       const std::vector<std::string>& setOfActions,
       const std::vector<std::string>& intToWords, double* right);
 
-  void LoadPretrainedWords(const std::string& words_path) {
-    std::cerr << "Loading word vectors from " << words_path;
-    std::ifstream in(words_path);
-
-    // Read header
-    std::string line;
-    std::getline(in, line);
-    std::istringstream first_line(line);
-    unsigned num_words;
-    first_line >> num_words;
-    unsigned pretrained_dim;
-    first_line >> pretrained_dim;
-    std::cerr << " with " << pretrained_dim << " dimensions..." << std::endl;
-
-    // Read std::vectors
-    pretrained[vocab.wordsToInt[vocab.UNK]] = std::vector<float>(pretrained_dim,
-                                                                 0);
-    std::vector<float> v(pretrained_dim, 0);
-    std::string word;
-    while (getline(in, line)) {
-      std::istringstream lin(line);
-      lin >> word;
-      for (unsigned i = 0; i < pretrained_dim; ++i)
-        lin >> v[i];
-      // We DON'T yet know this word is present in training data.
-      unsigned id = vocab.GetOrAddWord(word, false);
-      pretrained[id] = v;
-    }
-    assert(num_words == pretrained.size() - 1); // -1 for UNK
-    std::cerr << "Loaded " << pretrained.size() - 1 << " words" << std::endl;
-  }
+  void LoadPretrainedWords(const std::string& words_path);
 
   void FinalizeVocab();
 

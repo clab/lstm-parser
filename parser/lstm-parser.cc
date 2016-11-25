@@ -28,6 +28,44 @@ namespace lstm_parser {
 constexpr const char* LSTMParser::ROOT_SYMBOL;
 
 
+void LSTMParser::LoadPretrainedWords(const string& words_path) {
+  std::cerr << "Loading word vectors from " << words_path;
+  std::ifstream in;
+  in.open(words_path);
+  if (!in) {
+    cout << "..." << endl;
+    cerr << "ERROR: failed to open word vectors file " << words_path
+         << "; exiting" << endl;
+    exit(1);
+  }
+  // Read header
+  string line;
+  getline(in, line);
+  istringstream first_line(line);
+  unsigned num_words;
+  first_line >> num_words;
+  unsigned pretrained_dim;
+  first_line >> pretrained_dim;
+  cerr << " with " << pretrained_dim << " dimensions..." << endl;
+
+  // Read vectors
+  pretrained[vocab.wordsToInt[vocab.UNK]] = vector<float>(pretrained_dim, 0);
+  vector<float> v(pretrained_dim, 0);
+  string word;
+  while (getline(in, line)) {
+    istringstream lin(line);
+    lin >> word;
+    for (unsigned i = 0; i < pretrained_dim; ++i)
+      lin >> v[i];
+    // We DON'T yet know this word is present in training data.
+    unsigned id = vocab.GetOrAddWord(word, false);
+    pretrained[id] = v;
+  }
+  assert(num_words == pretrained.size() - 1); // -1 for UNK
+  cerr << "Loaded " << pretrained.size() - 1 << " words" << endl;
+}
+
+
 void LSTMParser::FinalizeVocab() {
   // assert (!finalized);
   if (finalized)

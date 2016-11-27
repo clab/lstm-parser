@@ -173,15 +173,12 @@ bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
 }
 
 
-map<int, int> LSTMParser::ComputeHeads(unsigned sent_len,
-                                          const vector<unsigned>& actions,
-                                          const vector<string>& setOfActions,
-                                          map<int, string>* rels) {
-  map<int, int> heads;
-  for (unsigned i = 0; i < sent_len; i++) {
-    heads[i] = -1;
-    if (rels)
-        (*rels)[i] = "ERROR";
+vector<int> LSTMParser::ComputeParseTree(
+        unsigned sent_len, const vector<unsigned>& actions,
+        const vector<string>& setOfActions, vector<string>* rels) {
+  vector<int> heads(sent_len, -1);
+  if (rels) {
+      *rels = vector<string>(sent_len, "ERROR");
   }
   vector<int> bufferi(sent_len + 1, 0), stacki(1, -999);
   for (unsigned i = 0; i < sent_len; ++i)
@@ -565,11 +562,11 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
         double lp = 0;
         llh -= lp;
         trs += actions.size();
-        map<int, int> ref = ComputeHeads(sentence.size(), actions,
-                                         dev_corpus.vocab->actions);
-        map<int, int> hyp = ComputeHeads(sentence.size(), pred,
-                                         dev_corpus.vocab->actions);
-        correct_heads += ComputeCorrect(ref, hyp, sentence.size() - 1);
+        vector<int> ref = ComputeParseTree(sentence.size(), actions,
+                                           dev_corpus.vocab->actions);
+        vector<int> hyp = ComputeParseTree(sentence.size(), pred,
+                                           dev_corpus.vocab->actions);
+        correct_heads += ComputeCorrect(ref, hyp);
         total_heads += sentence.size() - 1;
       }
       auto t_end = std::chrono::high_resolution_clock::now();
@@ -617,16 +614,16 @@ void LSTMParser::Test(const Corpus& corpus) {
                          corpus.vocab->intToWords, &correct);
     llh -= lp;
     trs += actions.size();
-    map<int, string> rel_ref;
-    map<int, string> rel_hyp;
-    map<int, int> ref = ComputeHeads(sentence.size(), actions,
-                                     corpus.vocab->actions, &rel_ref);
-    map<int, int> hyp = ComputeHeads(sentence.size(), pred,
+    vector<string> rel_ref;
+    vector<string> rel_hyp;
+    vector<int> ref = ComputeParseTree(sentence.size(), actions,
+                                       corpus.vocab->actions, &rel_ref);
+    vector<int> hyp = ComputeParseTree(sentence.size(), pred,
                                      corpus.vocab->actions, &rel_hyp);
     OutputConll(sentence, sentencePos, sentenceUnkStr,
                 corpus.vocab->intToWords, corpus.vocab->intToPos,
                 corpus.vocab->wordsToInt, hyp, rel_hyp);
-    correct_heads += ComputeCorrect(ref, hyp, sentence.size() - 1);
+    correct_heads += ComputeCorrect(ref, hyp);
     total_heads += sentence.size() - 1;
   }
   auto t_end = std::chrono::high_resolution_clock::now();
@@ -644,8 +641,8 @@ void LSTMParser::OutputConll(const vector<unsigned>& sentence,
                              const vector<string>& intToWords,
                              const vector<string>& intToPos,
                              const map<string, unsigned>& wordsToInt,
-                             const map<int, int>& hyp,
-                             const map<int, string>& rel_hyp) {
+                             const vector<int>& hyp,
+                             const vector<string>& rel_hyp) {
   for (unsigned i = 0; i < (sentence.size() - 1); ++i) {
     auto index = i + 1;
     const unsigned int unk_word =
@@ -657,17 +654,14 @@ void LSTMParser::OutputConll(const vector<unsigned>& sentence,
     string wit = (sentenceUnkStrings[i].size() > 0) ?
                   sentenceUnkStrings[i] : intToWords[sentence[i]];
     const string& pos_tag = intToPos[pos[i]];
-    assert(hyp.find(i) != hyp.end());
-    auto hyp_head = hyp.find(i)->second + 1;
+    int hyp_head = hyp[i] + 1;
     if (hyp_head == (int) sentence.size())
       hyp_head = 0;
-    auto hyp_rel_it = rel_hyp.find(i);
-    assert(hyp_rel_it != rel_hyp.end());
-    auto hyp_rel = hyp_rel_it->second;
-    size_t first_char_in_rel = hyp_rel.find('(') + 1;
-    size_t last_char_in_rel = hyp_rel.rfind(')') - 1;
-    hyp_rel = hyp_rel.substr(first_char_in_rel,
-                             last_char_in_rel - first_char_in_rel + 1);
+    const string& hyp_rel_action = rel_hyp[i];
+    size_t first_char_in_rel = hyp_rel_action.find('(') + 1;
+    size_t last_char_in_rel = hyp_rel_action.rfind(')') - 1;
+    string hyp_rel = hyp_rel_action.substr(
+        first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
     cout << index << '\t'       // 1. ID
          << wit << '\t'         // 2. FORM
          << "_" << '\t'         // 3. LEMMA

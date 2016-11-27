@@ -108,10 +108,10 @@ public:
 
   // take a std::vector of actions and return a parse tree (labeling of every
   // word position with its head's position)
-  static std::map<int, int> ComputeHeads(
+  static std::vector<int> ComputeParseTree(
       unsigned sent_len, const std::vector<unsigned>& actions,
       const std::vector<std::string>& setOfActions,
-      std::map<int, std::string>* pr = nullptr);
+      std::vector<std::string>* pr = nullptr);
 
   void Train(const Corpus& corpus, const Corpus& dev_corpus,
              const double unk_prob, const std::string& model_fname,
@@ -143,18 +143,15 @@ protected:
   void SaveModel(const std::string& model_fname, bool compress,
                  bool softlinkCreated);
 
-  unsigned ComputeCorrect(const std::map<int, int>& ref,
-                          const std::map<int, int>& hyp, unsigned len) const {
-    unsigned res = 0;
-    for (unsigned i = 0; i < len; ++i) {
-      auto ri = ref.find(i);
-      auto hi = hyp.find(i);
-      assert(ri != ref.end());
-      assert(hi != hyp.end());
-      if (ri->second == hi->second)
-        ++res;
+  inline unsigned ComputeCorrect(const std::vector<int>& ref,
+                                 const std::vector<int>& hyp) const {
+    assert(ref.size() == hyp.size());
+    unsigned correct_count = 0;
+    for (unsigned i = 0; i < ref.size(); ++i) {
+      if (ref[i] == hyp[i])
+        ++correct_count;
     }
-    return res;
+    return correct_count;
   }
 
 private:
@@ -174,8 +171,8 @@ private:
                           const std::vector<std::string>& intToWords,
                           const std::vector<std::string>& intToPos,
                           const std::map<std::string, unsigned>& wordsToInt,
-                          const std::map<int, int>& hyp,
-                          const std::map<int, std::string>& rel_hyp);
+                          const std::vector<int>& hyp,
+                          const std::vector<std::string>& rel_hyp);
 };
 
 } // namespace lstm_parser

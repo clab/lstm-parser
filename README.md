@@ -9,13 +9,7 @@ For the [EMNLP character-based model](http://arxiv.org/pdf/1508.00657.pdf), plea
  * [Boost](http://www.boost.org/) libraries
  * [Eigen](http://eigen.tuxfamily.org) (newer versions strongly recommended)
  * [CMake](http://www.cmake.org/)
-
-#### Checking out the project for the first time
-
-The first time you clone the repository, you need to sync the `cnn/` submodule.
-
-    git submodule init
-    git submodule update
+ * [gcc](https://gcc.gnu.org/gcc-5/) (only tested with gcc version 5.3.0, may be incompatible with earlier versions)
 
 #### Build instructions
 
@@ -73,4 +67,4 @@ This software is released under the terms of the [Apache License, Version 2.0](h
 
 #### Contact
 
-For questions and usage issues, please contact cdyer@cs.cmu.edu and miguel.ballesteros@upf.edu
+For questions and usage issues, please contact cdyer@cs.cmu.edu and miguel.ballesteros@upf.edu.

@@ -154,7 +154,7 @@ public:
              const double unk_prob, const std::string& model_fname,
              bool compress, const volatile bool* requested_stop=nullptr);
 
-  void Test(const Corpus& corpus);
+  void Test(const Corpus& corpus, bool evaluate = false);
 
   // Used for testing. Replaces OOV with UNK.
   std::vector<unsigned> LogProbParser(

@@ -206,7 +206,7 @@ int main(int argc, char** argv) {
     parser.Train(training_corpus, dev_corpus, unk_prob, fname, compress,
                  &requested_stop);
     if (test) { // do test evaluation
-      parser.Test(dev_corpus);
+      parser.Test(dev_corpus, true);
     }
   }
   else if (test) { // actually run the parser

@@ -597,39 +597,46 @@ ParseTree LSTMParser::Parse(const vector<unsigned>& sentence,
 }
 
 
-void LSTMParser::Test(const Corpus& corpus) {
-  // do test evaluation
+void LSTMParser::Test(const Corpus& corpus, bool evaluate) {
   double llh = 0;
   double trs = 0;
   double correct = 0;
   double correct_heads = 0;
   double total_heads = 0;
-  auto t_start = std::chrono::high_resolution_clock::now();
+  auto t_start = chrono::high_resolution_clock::now();
   unsigned corpus_size = corpus.sentences.size();
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
     const vector<unsigned>& sentence = corpus.sentences[sii];
     const vector<unsigned>& sentence_pos = corpus.sentences_pos[sii];
     const vector<string>& sentence_unk_str =
         corpus.sentences_surface_forms[sii];
-    const vector<unsigned>& actions = corpus.correct_act_sent[sii];
-    double lp = 0;
     ParseTree hyp = Parse(sentence, sentence_pos, vocab, true, &correct);
-    llh -= lp;
-    trs += actions.size();
-    ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
-                                     corpus.vocab->actions_to_arc_labels, true);
     OutputConll(sentence, sentence_pos, sentence_unk_str,
                 corpus.vocab->int_to_words, corpus.vocab->int_to_pos,
                 corpus.vocab->words_to_int, hyp);
-    correct_heads += ComputeCorrect(ref, hyp);
-    total_heads += sentence.size() - 1;
+
+    if (evaluate) {
+      const vector<unsigned>& actions = corpus.correct_act_sent[sii];
+      ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
+                                       corpus.vocab->actions_to_arc_labels,
+                                       true);
+      trs += actions.size();
+      correct_heads += ComputeCorrect(ref, hyp);
+      total_heads += sentence.size() - 1;
+    }
   }
-  auto t_end = std::chrono::high_resolution_clock::now();
-  cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: "
-       << (trs - correct) / trs << " uas: " << (correct_heads / total_heads)
-       << "\t[" << corpus_size << " sents in "
-       << std::chrono::duration<double, std::milli>(t_end - t_start).count()
-       << " ms]" << endl;
+  auto t_end = chrono::high_resolution_clock::now();
+  if (evaluate) {
+    cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: "
+         << (trs - correct) / trs << " uas: " << (correct_heads / total_heads)
+         << "\t[" << corpus_size << " sents in "
+         << chrono::duration<double, std::milli>(t_end - t_start).count()
+         << " ms]" << endl;
+  } else {
+    cerr << "Parsed " << corpus_size << " sentences in "
+         << chrono::duration<double, std::milli>(t_end - t_start).count()
+         << "milliseconds." << endl;
+  }
 }
 
 

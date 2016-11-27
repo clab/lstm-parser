@@ -21,38 +21,38 @@ public:
   static const std::string UNK;
   static const std::string BAD0;
 
-  StrToIntMap wordsToInt;
-  std::vector<std::string> intToWords;
-  std::vector<bool> intToTrainingWord; // Stores whether each word is OOV
+  StrToIntMap words_to_int;
+  std::vector<std::string> int_to_words;
+  std::vector<bool> int_to_training_word; // Stores whether each word is OOV
 
-  StrToIntMap posToInt;
-  std::vector<std::string> intToPos;
+  StrToIntMap pos_to_int;
+  std::vector<std::string> int_to_pos;
 
-  StrToIntMap charsToInt;
-  std::vector<std::string> intToChars;
+  StrToIntMap chars_to_int;
+  std::vector<std::string> int_to_chars;
 
   std::vector<std::string> actions;
 
-  CorpusVocabulary() : intToTrainingWord({true, true}) {
-    AddEntry(BAD0, &wordsToInt, &intToWords);
-    AddEntry(UNK, &wordsToInt, &intToWords);
-    AddEntry(BAD0, &charsToInt, &intToChars);
+  CorpusVocabulary() : int_to_training_word({true, true}) {
+    AddEntry(BAD0, &words_to_int, &int_to_words);
+    AddEntry(UNK, &words_to_int, &int_to_words);
+    AddEntry(BAD0, &chars_to_int, &int_to_chars);
   }
 
-  inline unsigned CountPOS() { return posToInt.size(); }
-  inline unsigned CountWords() { return wordsToInt.size(); }
-  inline unsigned CountChars() { return charsToInt.size(); }
+  inline unsigned CountPOS() { return pos_to_int.size(); }
+  inline unsigned CountWords() { return words_to_int.size(); }
+  inline unsigned CountChars() { return chars_to_int.size(); }
   inline unsigned CountActions() { return actions.size(); }
 
   inline unsigned GetOrAddWord(const std::string& word,
                                bool record_as_training=false) {
     unsigned num_words = CountWords();
-    unsigned word_id = GetOrAddEntry(word, &wordsToInt, &intToWords);
+    unsigned word_id = GetOrAddEntry(word, &words_to_int, &int_to_words);
     if (CountWords() > num_words) { // a word was added
-      intToTrainingWord.push_back(record_as_training);
+      int_to_training_word.push_back(record_as_training);
     } else {
       // Should get optimized out when record_as_training is literal false.
-      intToTrainingWord[word_id] = intToTrainingWord[word_id]
+      int_to_training_word[word_id] = int_to_training_word[word_id]
           || record_as_training;
     }
     return word_id;
@@ -66,10 +66,10 @@ private:
   // reverse mappings can be reconstructed.
   static void serializeLists(Archive& ar, const unsigned int version,
                              VocabType* vocab) {
-    ar & vocab->intToWords;
-    ar & vocab->intToPos;
-    ar & vocab->intToChars;
-    ar & vocab->intToTrainingWord;
+    ar & vocab->int_to_words;
+    ar & vocab->int_to_pos;
+    ar & vocab->int_to_chars;
+    ar & vocab->int_to_training_word;
     ar & vocab->actions;
   }
 
@@ -80,28 +80,28 @@ private:
 
   template<class Archive>
   void load(Archive& ar, const unsigned int version) {
-    unsigned num_existing_words = intToWords.size();
+    unsigned num_existing_words = int_to_words.size();
 
-    wordsToInt.clear();
-    intToWords.clear();
-    posToInt.clear();
-    intToPos.clear();
-    charsToInt.clear();
-    intToChars.clear();
+    words_to_int.clear();
+    int_to_words.clear();
+    pos_to_int.clear();
+    int_to_pos.clear();
+    chars_to_int.clear();
+    int_to_chars.clear();
 
     serializeLists(ar, version, this);
-    if (intToWords.size() < num_existing_words) {
-      std::cerr << "WARNING: lost " << num_existing_words - intToWords.size()
+    if (int_to_words.size() < num_existing_words) {
+      std::cerr << "WARNING: lost " << num_existing_words - int_to_words.size()
                 << " words when loading model" << std::endl;
     }
 
     // Now reconstruct the reverse mappings.
-    for (size_t i = 0; i < intToWords.size(); ++i)
-      wordsToInt[intToWords[i]] = i;
-    for (size_t i = 0; i < intToPos.size(); ++i)
-      posToInt[intToPos[i]] = i;
-    for (size_t i = 0; i < intToChars.size(); ++i)
-      charsToInt[intToChars[i]] = i;
+    for (size_t i = 0; i < int_to_words.size(); ++i)
+      words_to_int[int_to_words[i]] = i;
+    for (size_t i = 0; i < int_to_pos.size(); ++i)
+      pos_to_int[int_to_pos[i]] = i;
+    for (size_t i = 0; i < int_to_chars.size(); ++i)
+      chars_to_int[int_to_chars[i]] = i;
   }
   BOOST_SERIALIZATION_SPLIT_MEMBER()
 
@@ -136,8 +136,8 @@ public:
 
   std::vector<std::vector<unsigned>> correct_act_sent;
   std::vector<std::vector<unsigned>> sentences;
-  std::vector<std::vector<unsigned>> sentencesPos;
-  std::vector<std::vector<std::string>> sentencesSurfaceForms;
+  std::vector<std::vector<unsigned>> sentences_pos;
+  std::vector<std::vector<std::string>> sentences_surface_forms;
   std::set<unsigned> singletons;
 
   /*

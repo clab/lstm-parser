@@ -163,8 +163,8 @@ public:
       const std::vector<unsigned>& sent,  // sentence with OOVs replaced
       const std::vector<unsigned>& sentPos,
       const std::vector<unsigned>& correct_actions,
-      const std::vector<std::string>& setOfActions,
-      const std::vector<std::string>& intToWords, double* right);
+      const std::vector<std::string>& action_names,
+      const std::vector<std::string>& int_to_words, double* right);
 
   void LoadPretrainedWords(const std::string& words_path);
 
@@ -172,7 +172,7 @@ public:
 
 protected:
   void SaveModel(const std::string& model_fname, bool compress,
-                 bool softlinkCreated);
+                 bool softlink_created);
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {
@@ -198,10 +198,10 @@ private:
 
   static void OutputConll(const std::vector<unsigned>& sentence,
                           const std::vector<unsigned>& pos,
-                          const std::vector<std::string>& sentenceUnkStrings,
-                          const std::vector<std::string>& intToWords,
-                          const std::vector<std::string>& intToPos,
-                          const std::map<std::string, unsigned>& wordsToInt,
+                          const std::vector<std::string>& sentence_unk_strings,
+                          const std::vector<std::string>& int_to_words,
+                          const std::vector<std::string>& int_to_pos,
+                          const std::map<std::string, unsigned>& words_to_int,
                           const ParseTree& tree);
 };
 

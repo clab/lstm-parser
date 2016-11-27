@@ -55,11 +55,11 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
         // Store the sentence variables and clear them for the next sentence.
         sentences.push_back({});
         sentences.back().swap(current_sent);
-        sentencesPos.push_back({});
-        sentencesPos.back().swap(current_sent_pos);
+        sentences_pos.push_back({});
+        sentences_pos.back().swap(current_sent_pos);
         if (!is_training) {
-          sentencesSurfaceForms.push_back({});
-          sentencesSurfaceForms.back().swap(current_sent_surface_strs);
+          sentences_surface_forms.push_back({});
+          sentences_surface_forms.back().swap(current_sent_surface_strs);
         }
       }
       start_of_sentence = true;
@@ -98,8 +98,8 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
 
           // We assume that we'll have seen all POS tags in training, so don't
           // worry about OOV tags.
-          unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->posToInt,
-                                                 &vocab->intToPos);
+          unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
+                                                 &vocab->int_to_pos);
           unsigned word_id;
           if (is_training) {
             unsigned num_words = vocab->CountWords(); // store for later check
@@ -110,13 +110,13 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
               while (j < word.length()) {
                 unsigned char_utf8_len = UTF8Len(word[j]);
                 string next_utf8_char = word.substr(j, char_utf8_len);
-                vocab->GetOrAddEntry(next_utf8_char, &vocab->charsToInt,
-                                     &vocab->intToChars);
+                vocab->GetOrAddEntry(next_utf8_char, &vocab->chars_to_int,
+                                     &vocab->int_to_chars);
                 j += char_utf8_len;
               }
             } else {
               // It's an old word. Make sure it's marked as present in training.
-              vocab->intToTrainingWord[word_id] = true;
+              vocab->int_to_training_word[word_id] = true;
             }
           } else {
             // add an empty string for any token except OOVs (it is easy to
@@ -126,11 +126,11 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
               word_id = vocab->GetOrAddWord(word); // don't record as training
               current_sent_surface_strs.push_back("");
             } else {
-              auto word_iter = vocab->wordsToInt.find(word);
-              if (word_iter == vocab->wordsToInt.end()) {
+              auto word_iter = vocab->words_to_int.find(word);
+              if (word_iter == vocab->words_to_int.end()) {
                 // Save the surface form of this OOV.
                 current_sent_surface_strs.push_back(word);
-                word_id = vocab->wordsToInt[vocab->UNK];
+                word_id = vocab->words_to_int[vocab->UNK];
               } else {
                 current_sent_surface_strs.push_back("");
                 word_id = word_iter->second;
@@ -178,9 +178,9 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
   // Add the last sentence.
   if (current_sent.size() > 0) {
     sentences.push_back(move(current_sent));
-    sentencesPos.push_back(move(current_sent_pos));
+    sentences_pos.push_back(move(current_sent_pos));
     if (!is_training) {
-      sentencesSurfaceForms.push_back(move(current_sent_surface_strs));
+      sentences_surface_forms.push_back(move(current_sent_surface_strs));
     }
   }
 
@@ -195,8 +195,8 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
   cerr << "# of actions: " << vocab->CountActions() << "\n";
   cerr << "# of words: " << vocab->CountWords() << "\n";
   if (is_training) {
-    for (unsigned i = 0; i < vocab->intToPos.size(); i++) {
-      cerr << i << ":" << vocab->intToPos[i] << "\n";
+    for (unsigned i = 0; i < vocab->int_to_pos.size(); i++) {
+      cerr << i << ":" << vocab->int_to_pos[i] << "\n";
     }
   } else {
     cerr << "# of POS tags: " << vocab->CountPOS() << "\n";

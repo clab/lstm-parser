@@ -49,7 +49,7 @@ void LSTMParser::LoadPretrainedWords(const string& words_path) {
   cerr << " with " << pretrained_dim << " dimensions..." << endl;
 
   // Read vectors
-  pretrained[vocab.wordsToInt[vocab.UNK]] = vector<float>(pretrained_dim, 0);
+  pretrained[vocab.words_to_int[vocab.UNK]] = vector<float>(pretrained_dim, 0);
   vector<float> v(pretrained_dim, 0);
   string word;
   while (getline(in, line)) {
@@ -221,8 +221,8 @@ vector<unsigned> LSTMParser::LogProbParser(
     ComputationGraph* hg,
     const vector<unsigned>& raw_sent,  // raw sentence
     const vector<unsigned>& sent,  // sentence with OOVs replaced
-    const vector<unsigned>& sentPos, const vector<unsigned>& correct_actions,
-    const vector<string>& setOfActions, const vector<std::string>& intToWords,
+    const vector<unsigned>& sent_pos, const vector<unsigned>& correct_actions,
+    const vector<string>& action_names, const vector<std::string>& int_to_words,
     double* correct) {
   // TODO: break up this function?
   assert(finalized);
@@ -269,7 +269,7 @@ vector<unsigned> LSTMParser::LogProbParser(
 
     vector<Expression> args = {ib, w2l, w}; // learn embeddings
     if (options.use_pos) { // learn POS tag?
-      Expression p = lookup(*hg, p_p, sentPos[i]);
+      Expression p = lookup(*hg, p_p, sent_pos[i]);
       args.push_back(p2l);
       args.push_back(p);
     }
@@ -300,7 +300,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     // get list of possible actions for the current parser state
     vector<unsigned> current_valid_actions;
     for (unsigned action = 0; action < n_possible_actions; ++action) {
-      if (IsActionForbidden(setOfActions[action], buffer.size(), stack.size(),
+      if (IsActionForbidden(action_names[action], buffer.size(), stack.size(),
                             stacki))
         continue;
       current_valid_actions.push_back(action);
@@ -345,7 +345,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     Expression relation = lookup(*hg, p_r, action);
 
     // do action
-    const string& actionString = setOfActions[action];
+    const string& actionString = action_names[action];
     const char ac = actionString[0];
     const char ac2 = actionString[1];
 
@@ -398,7 +398,7 @@ vector<unsigned> LSTMParser::LogProbParser(
       stack.pop_back();
       stacki.pop_back();
       if (headi == sent.size() - 1)
-        rootword = intToWords[sent[depi]];
+        rootword = int_to_words[sent[depi]];
       // composed = cbias + H * head + D * dep + R * relation
       Expression composed = affine_transform({cbias, H, head, D, dep, R,
                                               relation});
@@ -421,7 +421,7 @@ vector<unsigned> LSTMParser::LogProbParser(
 
 
 void LSTMParser::SaveModel(const string& model_fname, bool compress,
-                           bool softlinkCreated) {
+                           bool softlink_created) {
   ofstream out_file(model_fname);
   if (compress) {
     io::filtering_streambuf<io::output> filter;
@@ -436,7 +436,7 @@ void LSTMParser::SaveModel(const string& model_fname, bool compress,
   cerr << "Model saved." << endl;
   // Create a soft link to the most recent model in order to make it
   // easier to refer to it in a shell script.
-  if (!softlinkCreated) {
+  if (!softlink_created) {
     string softlink = "latest_model.params";
     if (compress)
       softlink += ".gz";
@@ -453,7 +453,7 @@ void LSTMParser::SaveModel(const string& model_fname, bool compress,
 void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
                        const double unk_prob, const string& model_fname,
                        bool compress, const volatile bool* requested_stop) {
-  bool softlinkCreated = false;
+  bool softlink_created = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
   SimpleSGDTrainer sgd(&model);
@@ -501,11 +501,12 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
           }
         }
       }
-      const vector<unsigned>& sentencePos = corpus.sentencesPos[order[si]];
+      const vector<unsigned>& sentence_pos = corpus.sentences_pos[order[si]];
       const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
       ComputationGraph hg;
-      LogProbParser(&hg, sentence, tsentence, sentencePos, actions,
-                    corpus.vocab->actions, corpus.vocab->intToWords, &correct);
+      LogProbParser(&hg, sentence, tsentence, sentence_pos, actions,
+                    corpus.vocab->actions, corpus.vocab->int_to_words,
+                    &correct);
       double lp = as_scalar(hg.incremental_forward());
       if (lp < 0) {
         cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp
@@ -523,8 +524,8 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
         std::chrono::system_clock::now());
     cerr << "update #" << iter << " (epoch " << (tot_seen / num_sentences)
          << " |time=" << put_time(localtime(&time_now), "%c %Z") << ")\tllh: "
-         << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - correct) / trs
-         << endl;
+         << llh << " ppl: " << exp(llh / trs) << " err: "
+         << (trs - correct) / trs << endl;
     llh = trs = correct = 0;
     static int logc = 0;
     ++logc;
@@ -540,19 +541,19 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
       auto t_start = std::chrono::high_resolution_clock::now();
       for (unsigned sii = 0; sii < dev_size; ++sii) {
         const vector<unsigned>& sentence = dev_corpus.sentences[sii];
-        const vector<unsigned>& sentencePos = dev_corpus.sentencesPos[sii];
+        const vector<unsigned>& sentence_pos = dev_corpus.sentences_pos[sii];
         const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
         vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
         for (unsigned& word_id : tsentence) {
-          if (!vocab.intToTrainingWord[word_id]) {
+          if (!vocab.int_to_training_word[word_id]) {
             word_id = kUNK;
           }
         }
         ComputationGraph hg;
         vector<unsigned> pred = LogProbParser(&hg, sentence, tsentence,
-                                              sentencePos, vector<unsigned>(),
+                                              sentence_pos, vector<unsigned>(),
                                               dev_corpus.vocab->actions,
-                                              dev_corpus.vocab->intToWords,
+                                              dev_corpus.vocab->int_to_words,
                                               &correct);
 
         double lp = 0;
@@ -574,8 +575,8 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
            << " ms]" << endl;
       if (correct_heads > best_correct_heads) {
         best_correct_heads = correct_heads;
-        SaveModel(model_fname, compress, softlinkCreated);
-        softlinkCreated = true;
+        SaveModel(model_fname, compress, softlink_created);
+        softlink_created = true;
       }
     }
   }
@@ -593,30 +594,31 @@ void LSTMParser::Test(const Corpus& corpus) {
   unsigned corpus_size = corpus.sentences.size();
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
     const vector<unsigned>& sentence = corpus.sentences[sii];
-    const vector<unsigned>& sentencePos = corpus.sentencesPos[sii];
-    const vector<string>& sentenceUnkStr = corpus.sentencesSurfaceForms[sii];
+    const vector<unsigned>& sentence_pos = corpus.sentences_pos[sii];
+    const vector<string>& sentence_unk_str =
+        corpus.sentences_surface_forms[sii];
     const vector<unsigned>& actions = corpus.correct_act_sent[sii];
     vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
     for (unsigned& word_id : tsentence) {
-      if (vocab.intToTrainingWord[word_id]) {
+      if (vocab.int_to_training_word[word_id]) {
         word_id = kUNK;
       }
     }
     ComputationGraph cg;
     double lp = 0;
     vector<unsigned> pred;
-    pred = LogProbParser(&cg, sentence, tsentence, sentencePos,
+    pred = LogProbParser(&cg, sentence, tsentence, sentence_pos,
                          vector<unsigned>(), corpus.vocab->actions,
-                         corpus.vocab->intToWords, &correct);
+                         corpus.vocab->int_to_words, &correct);
     llh -= lp;
     trs += actions.size();
     ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
                                      true);
     ParseTree hyp = RecoverParseTree(sentence, pred, corpus.vocab->actions,
                                      true);
-    OutputConll(sentence, sentencePos, sentenceUnkStr,
-                corpus.vocab->intToWords, corpus.vocab->intToPos,
-                corpus.vocab->wordsToInt, hyp);
+    OutputConll(sentence, sentence_pos, sentence_unk_str,
+                corpus.vocab->int_to_words, corpus.vocab->int_to_pos,
+                corpus.vocab->words_to_int, hyp);
     correct_heads += ComputeCorrect(ref, hyp);
     total_heads += sentence.size() - 1;
   }
@@ -631,28 +633,26 @@ void LSTMParser::Test(const Corpus& corpus) {
 
 void LSTMParser::OutputConll(const vector<unsigned>& sentence,
                              const vector<unsigned>& pos,
-                             const vector<string>& sentenceUnkStrings,
-                             const vector<string>& intToWords,
-                             const vector<string>& intToPos,
-                             const map<string, unsigned>& wordsToInt,
+                             const vector<string>& sentence_unk_strings,
+                             const vector<string>& int_to_words,
+                             const vector<string>& int_to_pos,
+                             const map<string, unsigned>& words_to_int,
                              const ParseTree& tree) {
   for (unsigned i = 0; i < (sentence.size() - 1); ++i) {
     auto index = i + 1;
     const unsigned int unk_word =
-        wordsToInt.find(CorpusVocabulary::UNK)->second;
-    assert(i < sentenceUnkStrings.size() &&
-           ((sentence[i] == unk_word && sentenceUnkStrings[i].size() > 0) ||
-            (sentence[i] != unk_word && sentenceUnkStrings[i].size() == 0 &&
-             intToWords.size() > sentence[i])));
-    string wit = (sentenceUnkStrings[i].size() > 0) ?
-                  sentenceUnkStrings[i] : intToWords[sentence[i]];
-    const string& pos_tag = intToPos[pos[i]];
+        words_to_int.find(CorpusVocabulary::UNK)->second;
+    assert(i < sentence_unk_strings.size() &&
+           ((sentence[i] == unk_word && sentence_unk_strings[i].size() > 0) ||
+            (sentence[i] != unk_word && sentence_unk_strings[i].size() == 0 &&
+             int_to_words.size() > sentence[i])));
+    string wit = (sentence_unk_strings[i].size() > 0) ?
+                  sentence_unk_strings[i] : int_to_words[sentence[i]];
+    const string& pos_tag = int_to_pos[pos[i]];
     int parent = tree.GetParents()[i] + 1;
     if (parent == (int) sentence.size())
       parent = 0;
     const string& rel_action = tree.GetArcLabels()[i];
-    // TODO: move this translation from actions to dependency labels to
-    // RecoverParseTree.
     size_t first_char_in_rel = rel_action.find('(') + 1;
     size_t last_char_in_rel = rel_action.rfind(')') - 1;
     string deprel = rel_action.substr(

@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
   LSTMParser parser(cmd_options, words, false);
   if (load_model) {
     const string& model_path = conf["model"].as<string>();
-    cerr << "Loading model from " << model_path << endl;
+    cerr << "Loading model from " << model_path << "...";
     if (boost::algorithm::ends_with(model_path, ".gz")) {
       // It's a compressed stream.
       ifstream model_stream(model_path.c_str());
@@ -168,6 +168,7 @@ int main(int argc, char** argv) {
       boost::archive::text_iarchive archive(model_stream);
       archive >> parser;
     }
+    cerr << "done." << endl;
 
     if (parser.options != cmd_options) {
       // TODO: make this recognize the difference between a default option and

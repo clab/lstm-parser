@@ -173,7 +173,7 @@ bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
 }
 
 
-vector<int> LSTMParser::ComputeParseTree(
+vector<int> LSTMParser::RecoverParseTree(
         unsigned sent_len, const vector<unsigned>& actions,
         const vector<string>& setOfActions, vector<string>* rels) {
   vector<int> heads(sent_len, -1);
@@ -562,9 +562,9 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
         double lp = 0;
         llh -= lp;
         trs += actions.size();
-        vector<int> ref = ComputeParseTree(sentence.size(), actions,
+        vector<int> ref = RecoverParseTree(sentence.size(), actions,
                                            dev_corpus.vocab->actions);
-        vector<int> hyp = ComputeParseTree(sentence.size(), pred,
+        vector<int> hyp = RecoverParseTree(sentence.size(), pred,
                                            dev_corpus.vocab->actions);
         correct_heads += ComputeCorrect(ref, hyp);
         total_heads += sentence.size() - 1;
@@ -616,9 +616,9 @@ void LSTMParser::Test(const Corpus& corpus) {
     trs += actions.size();
     vector<string> rel_ref;
     vector<string> rel_hyp;
-    vector<int> ref = ComputeParseTree(sentence.size(), actions,
+    vector<int> ref = RecoverParseTree(sentence.size(), actions,
                                        corpus.vocab->actions, &rel_ref);
-    vector<int> hyp = ComputeParseTree(sentence.size(), pred,
+    vector<int> hyp = RecoverParseTree(sentence.size(), pred,
                                      corpus.vocab->actions, &rel_hyp);
     OutputConll(sentence, sentencePos, sentenceUnkStr,
                 corpus.vocab->intToWords, corpus.vocab->intToPos,

@@ -108,7 +108,7 @@ public:
 
   // take a std::vector of actions and return a parse tree (labeling of every
   // word position with its head's position)
-  static std::vector<int> ComputeParseTree(
+  static std::vector<int> RecoverParseTree(
       unsigned sent_len, const std::vector<unsigned>& actions,
       const std::vector<std::string>& setOfActions,
       std::vector<std::string>* pr = nullptr);

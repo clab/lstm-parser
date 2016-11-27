@@ -1,6 +1,7 @@
 #ifndef CORPUS_H
 #define CORPUS_H
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <stddef.h>
 #include <iostream>
@@ -32,6 +33,7 @@ public:
   std::vector<std::string> int_to_chars;
 
   std::vector<std::string> actions;
+  std::vector<std::string> actions_to_arc_labels;
 
   CorpusVocabulary() : int_to_training_word({true, true}) {
     AddEntry(BAD0, &words_to_int, &int_to_words);
@@ -61,10 +63,23 @@ public:
 private:
   friend class boost::serialization::access;
 
+  static inline std::string GetLabelForAction(const std::string& action) {
+    if (boost::starts_with(action, "RIGHT-ARC") ||
+        boost::starts_with(action, "LEFT-ARC")) {
+      size_t first_char_in_rel = action.find('(') + 1;
+      size_t last_char_in_rel = action.rfind(')') - 1;
+      return action.substr(
+          first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
+    } else {
+      return "NONE";
+    }
+
+  }
+
   template<class Archive, class VocabType>
   // Shared code: serialize the number-to-string mappings, from which the
   // reverse mappings can be reconstructed.
-  static void serializeLists(Archive& ar, const unsigned int version,
+  static void SerializeLists(Archive& ar, const unsigned int version,
                              VocabType* vocab) {
     ar & vocab->int_to_words;
     ar & vocab->int_to_pos;
@@ -75,7 +90,7 @@ private:
 
   template<class Archive>
   void save(Archive& ar, const unsigned int version) const {
-    serializeLists(ar, version, this);
+    SerializeLists(ar, version, this);
   }
 
   template<class Archive>
@@ -89,7 +104,7 @@ private:
     chars_to_int.clear();
     int_to_chars.clear();
 
-    serializeLists(ar, version, this);
+    SerializeLists(ar, version, this);
     if (int_to_words.size() < num_existing_words) {
       std::cerr << "WARNING: lost " << num_existing_words - int_to_words.size()
                 << " words when loading model" << std::endl;
@@ -102,6 +117,11 @@ private:
       pos_to_int[int_to_pos[i]] = i;
     for (size_t i = 0; i < int_to_chars.size(); ++i)
       chars_to_int[int_to_chars[i]] = i;
+
+    // ...and reconstruct the arc labels.
+    for (const std::string& action : actions) {
+      actions_to_arc_labels.push_back(GetLabelForAction(action));
+    }
   }
   BOOST_SERIALIZATION_SPLIT_MEMBER()
 

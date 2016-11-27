@@ -154,6 +154,9 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
       } else { // A not-previously-seen action
         if (is_training) {
           vocab->actions.push_back(lineS);
+          vocab->actions_to_arc_labels.push_back(
+              vocab->GetLabelForAction(lineS));
+
           unsigned action_index = vocab->actions.size() - 1;
           if (start_of_sentence)
             correct_act_sent.push_back({action_index});

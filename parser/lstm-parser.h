@@ -138,11 +138,13 @@ public:
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
 
-  // take a std::vector of actions and return a parse tree
+  // take a vector of actions and return a parse tree
   static ParseTree RecoverParseTree(
       const std::vector<unsigned>& sentence,
       const std::vector<unsigned>& actions,
-      const std::vector<std::string>& action_names, bool labeled = false);
+      const std::vector<std::string>& action_names,
+      const std::vector<std::string>& actions_to_arc_labels,
+      bool labeled = false);
 
   void Train(const Corpus& corpus, const Corpus& dev_corpus,
              const double unk_prob, const std::string& model_fname,

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -58,6 +59,37 @@ struct ParserOptions {
 };
 
 
+class ParseTree {
+public:
+  // Barebones representation of a parse tree.
+  const std::vector<unsigned>& sentence;
+
+  ParseTree(const std::vector<unsigned>& sentence, bool labeled = true) :
+      sentence(sentence),
+      parents(sentence.size(), -1),
+      arc_labels( labeled ? new std::vector<std::string>(sentence.size(),
+                                                         "ERROR") : nullptr) {
+  }
+
+  inline void SetParent(unsigned index, unsigned parent_index,
+                      const std::string& arc_label="") {
+    parents[index] = parent_index;
+    if (arc_labels) {
+      (*arc_labels)[index] = arc_label;
+    }
+  }
+
+  const inline std::vector<int>& GetParents() const { return parents; }
+  const inline std::vector<std::string>& GetArcLabels() const {
+    return *arc_labels;
+  }
+
+private:
+  std::vector<int> parents;
+  std::unique_ptr<std::vector<std::string>> arc_labels;
+};
+
+
 class LSTMParser {
 public:
   // TODO: make some of these members non-public
@@ -106,12 +138,11 @@ public:
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
 
-  // take a std::vector of actions and return a parse tree (labeling of every
-  // word position with its head's position)
-  static std::vector<int> RecoverParseTree(
-      unsigned sent_len, const std::vector<unsigned>& actions,
-      const std::vector<std::string>& setOfActions,
-      std::vector<std::string>* pr = nullptr);
+  // take a std::vector of actions and return a parse tree
+  static ParseTree RecoverParseTree(
+      const std::vector<unsigned>& sentence,
+      const std::vector<unsigned>& actions,
+      const std::vector<std::string>& action_names, bool labeled = false);
 
   void Train(const Corpus& corpus, const Corpus& dev_corpus,
              const double unk_prob, const std::string& model_fname,
@@ -143,12 +174,12 @@ protected:
   void SaveModel(const std::string& model_fname, bool compress,
                  bool softlinkCreated);
 
-  inline unsigned ComputeCorrect(const std::vector<int>& ref,
-                                 const std::vector<int>& hyp) const {
-    assert(ref.size() == hyp.size());
+  inline unsigned ComputeCorrect(const ParseTree& ref,
+                                 const ParseTree& hyp) const {
+    assert(ref.sentence.size() == hyp.sentence.size());
     unsigned correct_count = 0;
-    for (unsigned i = 0; i < ref.size(); ++i) {
-      if (ref[i] == hyp[i])
+    for (unsigned i = 0; i < ref.sentence.size(); ++i) {
+      if (ref.GetParents()[i] == hyp.GetParents()[i])
         ++correct_count;
     }
     return correct_count;
@@ -171,8 +202,7 @@ private:
                           const std::vector<std::string>& intToWords,
                           const std::vector<std::string>& intToPos,
                           const std::map<std::string, unsigned>& wordsToInt,
-                          const std::vector<int>& hyp,
-                          const std::vector<std::string>& rel_hyp);
+                          const ParseTree& tree);
 };
 
 } // namespace lstm_parser

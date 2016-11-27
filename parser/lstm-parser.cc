@@ -173,21 +173,19 @@ bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
 }
 
 
-vector<int> LSTMParser::RecoverParseTree(
-        unsigned sent_len, const vector<unsigned>& actions,
-        const vector<string>& setOfActions, vector<string>* rels) {
-  vector<int> heads(sent_len, -1);
-  if (rels) {
-      *rels = vector<string>(sent_len, "ERROR");
-  }
-  vector<int> bufferi(sent_len + 1, 0), stacki(1, -999);
-  for (unsigned i = 0; i < sent_len; ++i)
-    bufferi[sent_len - i] = i;
+ParseTree LSTMParser::RecoverParseTree(const vector<unsigned>& sentence,
+                                       const vector<unsigned>& actions,
+                                       const vector<string>& action_names,
+                                       bool labeled) {
+  ParseTree tree(sentence, labeled);
+  vector<int> bufferi(sentence.size() + 1, 0), stacki(1, -999);
+  for (unsigned i = 0; i < sentence.size(); ++i)
+    bufferi[sentence.size() - i] = i;
   bufferi[0] = -999;
   for (auto action : actions) { // loop over transitions for sentence
-    const string& actionString = setOfActions[action];
-    const char ac = actionString[0];
-    const char ac2 = actionString[1];
+    const string& action_string = action_names[action];
+    const char ac = action_string[0];
+    const char ac2 = action_string[1];
     if (ac == 'S' && ac2 == 'H') {  // SHIFT
       assert(bufferi.size() > 1); // dummy symbol means > 1 (not >= 1)
       stacki.push_back(bufferi.back());
@@ -210,14 +208,12 @@ vector<int> LSTMParser::RecoverParseTree(
       (ac == 'R' ? headi : depi) = stacki.back();
       stacki.pop_back();
       stacki.push_back(headi);
-      heads[depi] = headi;
-      if (rels)
-          (*rels)[depi] = actionString;
+      tree.SetParent(depi, headi, action_string);
     }
   }
   assert(bufferi.size() == 1);
   //assert(stacki.size() == 2);
-  return heads;
+  return tree;
 }
 
 
@@ -562,10 +558,10 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
         double lp = 0;
         llh -= lp;
         trs += actions.size();
-        vector<int> ref = RecoverParseTree(sentence.size(), actions,
-                                           dev_corpus.vocab->actions);
-        vector<int> hyp = RecoverParseTree(sentence.size(), pred,
-                                           dev_corpus.vocab->actions);
+        ParseTree ref = RecoverParseTree(sentence, actions,
+                                         dev_corpus.vocab->actions);
+        ParseTree hyp = RecoverParseTree(sentence, pred,
+                                         dev_corpus.vocab->actions);
         correct_heads += ComputeCorrect(ref, hyp);
         total_heads += sentence.size() - 1;
       }
@@ -614,15 +610,13 @@ void LSTMParser::Test(const Corpus& corpus) {
                          corpus.vocab->intToWords, &correct);
     llh -= lp;
     trs += actions.size();
-    vector<string> rel_ref;
-    vector<string> rel_hyp;
-    vector<int> ref = RecoverParseTree(sentence.size(), actions,
-                                       corpus.vocab->actions, &rel_ref);
-    vector<int> hyp = RecoverParseTree(sentence.size(), pred,
-                                     corpus.vocab->actions, &rel_hyp);
+    ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
+                                     true);
+    ParseTree hyp = RecoverParseTree(sentence, pred, corpus.vocab->actions,
+                                     true);
     OutputConll(sentence, sentencePos, sentenceUnkStr,
                 corpus.vocab->intToWords, corpus.vocab->intToPos,
-                corpus.vocab->wordsToInt, hyp, rel_hyp);
+                corpus.vocab->wordsToInt, hyp);
     correct_heads += ComputeCorrect(ref, hyp);
     total_heads += sentence.size() - 1;
   }
@@ -641,8 +635,7 @@ void LSTMParser::OutputConll(const vector<unsigned>& sentence,
                              const vector<string>& intToWords,
                              const vector<string>& intToPos,
                              const map<string, unsigned>& wordsToInt,
-                             const vector<int>& hyp,
-                             const vector<string>& rel_hyp) {
+                             const ParseTree& tree) {
   for (unsigned i = 0; i < (sentence.size() - 1); ++i) {
     auto index = i + 1;
     const unsigned int unk_word =
@@ -654,13 +647,15 @@ void LSTMParser::OutputConll(const vector<unsigned>& sentence,
     string wit = (sentenceUnkStrings[i].size() > 0) ?
                   sentenceUnkStrings[i] : intToWords[sentence[i]];
     const string& pos_tag = intToPos[pos[i]];
-    int hyp_head = hyp[i] + 1;
-    if (hyp_head == (int) sentence.size())
-      hyp_head = 0;
-    const string& hyp_rel_action = rel_hyp[i];
-    size_t first_char_in_rel = hyp_rel_action.find('(') + 1;
-    size_t last_char_in_rel = hyp_rel_action.rfind(')') - 1;
-    string hyp_rel = hyp_rel_action.substr(
+    int parent = tree.GetParents()[i] + 1;
+    if (parent == (int) sentence.size())
+      parent = 0;
+    const string& rel_action = tree.GetArcLabels()[i];
+    // TODO: move this translation from actions to dependency labels to
+    // RecoverParseTree.
+    size_t first_char_in_rel = rel_action.find('(') + 1;
+    size_t last_char_in_rel = rel_action.rfind(')') - 1;
+    string deprel = rel_action.substr(
         first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
     cout << index << '\t'       // 1. ID
          << wit << '\t'         // 2. FORM
@@ -668,8 +663,8 @@ void LSTMParser::OutputConll(const vector<unsigned>& sentence,
          << "_" << '\t'         // 4. CPOSTAG
          << pos_tag << '\t'     // 5. POSTAG
          << "_" << '\t'         // 6. FEATS
-         << hyp_head << '\t'    // 7. HEAD
-         << hyp_rel << '\t'     // 8. DEPREL
+         << parent << '\t'    // 7. HEAD
+         << deprel << '\t'     // 8. DEPREL
          << "_" << '\t'         // 9. PHEAD
          << "_" << endl;        // 10. PDEPREL
   }

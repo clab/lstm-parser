@@ -495,7 +495,7 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
       const vector<unsigned>& sentence = corpus.sentences[order[si]];
       vector<unsigned> tsentence(sentence);
       if (options.unk_strategy == 1) {
-        for (auto& w : tsentence) {
+        for (auto& w : tsentence) { // use reference to overwrite
           if (corpus.singletons.count(w) && cnn::rand01() < unk_prob) {
             w = kUNK;
           }
@@ -543,27 +543,13 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
         const vector<unsigned>& sentence = dev_corpus.sentences[sii];
         const vector<unsigned>& sentence_pos = dev_corpus.sentences_pos[sii];
         const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
-        vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
-        for (unsigned& word_id : tsentence) {
-          if (!vocab.int_to_training_word[word_id]) {
-            word_id = kUNK;
-          }
-        }
-        ComputationGraph hg;
-        vector<unsigned> pred = LogProbParser(&hg, sentence, tsentence,
-                                              sentence_pos, vector<unsigned>(),
-                                              dev_corpus.vocab->actions,
-                                              dev_corpus.vocab->int_to_words,
-                                              &correct);
+        ParseTree hyp = Parse(sentence, sentence_pos, vocab, false, &correct);
 
         double lp = 0;
         llh -= lp;
         trs += actions.size();
         ParseTree ref = RecoverParseTree(
             sentence, actions, dev_corpus.vocab->actions,
-            dev_corpus.vocab->actions_to_arc_labels);
-        ParseTree hyp = RecoverParseTree(
-            sentence, pred, dev_corpus.vocab->actions,
             dev_corpus.vocab->actions_to_arc_labels);
         correct_heads += ComputeCorrect(ref, hyp);
         total_heads += sentence.size() - 1;
@@ -584,6 +570,32 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
   }
 }
 
+vector<unsigned> LSTMParser::LogProbParser(
+    const vector<unsigned>& sentence, const vector<unsigned>& sentence_pos,
+    const CorpusVocabulary& vocab, ComputationGraph *cg,
+    double* correct) {
+  vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
+  for (unsigned& word_id : tsentence) { // use reference to overwrite
+    if (vocab.int_to_training_word[word_id]) {
+      word_id = kUNK;
+    }
+  }
+  return LogProbParser(cg, sentence, tsentence, sentence_pos,
+                       vector<unsigned>(), vocab.actions,
+                       vocab.int_to_words, correct);
+}
+
+ParseTree LSTMParser::Parse(const vector<unsigned>& sentence,
+                const vector<unsigned>& sentence_pos,
+                const CorpusVocabulary& vocab,
+                bool labeled, double* correct) {
+  ComputationGraph cg;
+  vector<unsigned> pred = LogProbParser(sentence, sentence_pos, vocab, &cg,
+                                        correct);
+  return RecoverParseTree(sentence, pred, vocab.actions,
+                          vocab.actions_to_arc_labels, labeled);
+}
+
 
 void LSTMParser::Test(const Corpus& corpus) {
   // do test evaluation
@@ -600,23 +612,11 @@ void LSTMParser::Test(const Corpus& corpus) {
     const vector<string>& sentence_unk_str =
         corpus.sentences_surface_forms[sii];
     const vector<unsigned>& actions = corpus.correct_act_sent[sii];
-    vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
-    for (unsigned& word_id : tsentence) {
-      if (vocab.int_to_training_word[word_id]) {
-        word_id = kUNK;
-      }
-    }
-    ComputationGraph cg;
     double lp = 0;
-    vector<unsigned> pred;
-    pred = LogProbParser(&cg, sentence, tsentence, sentence_pos,
-                         vector<unsigned>(), corpus.vocab->actions,
-                         corpus.vocab->int_to_words, &correct);
+    ParseTree hyp = Parse(sentence, sentence_pos, vocab, true, &correct);
     llh -= lp;
     trs += actions.size();
     ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
-                                     corpus.vocab->actions_to_arc_labels, true);
-    ParseTree hyp = RecoverParseTree(sentence, pred, corpus.vocab->actions,
                                      corpus.vocab->actions_to_arc_labels, true);
     OutputConll(sentence, sentence_pos, sentence_unk_str,
                 corpus.vocab->int_to_words, corpus.vocab->int_to_pos,

@@ -138,6 +138,10 @@ public:
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
 
+  ParseTree Parse(const std::vector<unsigned>& sentence,
+                  const std::vector<unsigned>& sentence_pos,
+                  const CorpusVocabulary& vocab, bool labeled, double* correct);
+
   // take a vector of actions and return a parse tree
   static ParseTree RecoverParseTree(
       const std::vector<unsigned>& sentence,
@@ -152,6 +156,17 @@ public:
 
   void Test(const Corpus& corpus);
 
+  // Used for testing. Replaces OOV with UNK.
+  std::vector<unsigned> LogProbParser(
+      const std::vector<unsigned>& sentence,
+      const std::vector<unsigned>& sentence_pos, const CorpusVocabulary& vocab,
+      cnn::ComputationGraph *cg, double* correct);
+
+  void LoadPretrainedWords(const std::string& words_path);
+
+  void FinalizeVocab();
+
+protected:
   // *** if correct_actions is empty, this runs greedy decoding ***
   // returns parse actions for input sentence (in training just returns the
   // reference)
@@ -168,11 +183,6 @@ public:
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& int_to_words, double* right);
 
-  void LoadPretrainedWords(const std::string& words_path);
-
-  void FinalizeVocab();
-
-protected:
   void SaveModel(const std::string& model_fname, bool compress,
                  bool softlink_created);
 

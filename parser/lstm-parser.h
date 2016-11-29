@@ -150,11 +150,17 @@ public:
       const std::vector<std::string>& actions_to_arc_labels,
       bool labeled = false);
 
-  void Train(const Corpus& corpus, const Corpus& dev_corpus,
+  void Train(const TrainingCorpus& corpus, const TrainingCorpus& dev_corpus,
              const double unk_prob, const std::string& model_fname,
-             bool compress, const volatile bool* requested_stop=nullptr);
+             bool compress, const volatile bool* requested_stop = nullptr);
 
-  void Test(const Corpus& corpus, bool evaluate = false);
+  void Test(const Corpus& corpus) {
+    DoTest(corpus, false);
+  }
+
+  void Evaluate(const TrainingCorpus& corpus) {
+    DoTest(corpus, true);
+  }
 
   // Used for testing. Replaces OOV with UNK.
   std::vector<unsigned> LogProbParser(
@@ -207,6 +213,8 @@ private:
     FinalizeVocab(); // finalize *after* vocab & pretrained to make load work
     ar & model;
   }
+
+  void DoTest(const Corpus& corpus, bool evaluate);
 
   static void OutputConll(const std::vector<unsigned>& sentence,
                           const std::vector<unsigned>& pos,

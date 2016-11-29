@@ -450,9 +450,10 @@ void LSTMParser::SaveModel(const string& model_fname, bool compress,
 }
 
 
-void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
-                       const double unk_prob, const string& model_fname,
-                       bool compress, const volatile bool* requested_stop) {
+void LSTMParser::Train(const TrainingCorpus& corpus,
+                       const TrainingCorpus& dev_corpus, const double unk_prob,
+                       const string& model_fname, bool compress,
+                       const volatile bool* requested_stop) {
   bool softlink_created = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
@@ -570,6 +571,7 @@ void LSTMParser::Train(const Corpus& corpus, const Corpus& dev_corpus,
   }
 }
 
+
 vector<unsigned> LSTMParser::LogProbParser(
     const vector<unsigned>& sentence, const vector<unsigned>& sentence_pos,
     const CorpusVocabulary& vocab, ComputationGraph *cg,
@@ -585,6 +587,7 @@ vector<unsigned> LSTMParser::LogProbParser(
                        vocab.int_to_words, correct);
 }
 
+
 ParseTree LSTMParser::Parse(const vector<unsigned>& sentence,
                 const vector<unsigned>& sentence_pos,
                 const CorpusVocabulary& vocab,
@@ -597,7 +600,7 @@ ParseTree LSTMParser::Parse(const vector<unsigned>& sentence,
 }
 
 
-void LSTMParser::Test(const Corpus& corpus, bool evaluate) {
+void LSTMParser::DoTest(const Corpus& corpus, bool evaluate) {
   double llh = 0;
   double trs = 0;
   double correct = 0;
@@ -608,7 +611,7 @@ void LSTMParser::Test(const Corpus& corpus, bool evaluate) {
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
     const vector<unsigned>& sentence = corpus.sentences[sii];
     const vector<unsigned>& sentence_pos = corpus.sentences_pos[sii];
-    const vector<string>& sentence_unk_str =
+    const vector<std::string>& sentence_unk_str =
         corpus.sentences_surface_forms[sii];
     ParseTree hyp = Parse(sentence, sentence_pos, vocab, true, &correct);
     OutputConll(sentence, sentence_pos, sentence_unk_str,
@@ -616,7 +619,12 @@ void LSTMParser::Test(const Corpus& corpus, bool evaluate) {
                 corpus.vocab->words_to_int, hyp);
 
     if (evaluate) {
-      const vector<unsigned>& actions = corpus.correct_act_sent[sii];
+      // Downcast to TrainingCorpus to get gold-standard data. We can only get
+      // here if this function was called by Evaluate, which statically checks
+      // that the corpus is in fact a TrainingCorpus, so this cast is safe.
+      const TrainingCorpus& training_corpus =
+          static_cast<const TrainingCorpus&>(corpus);
+      const vector<unsigned>& actions = training_corpus.correct_act_sent[sii];
       ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
                                        corpus.vocab->actions_to_arc_labels,
                                        true);
@@ -630,11 +638,11 @@ void LSTMParser::Test(const Corpus& corpus, bool evaluate) {
     cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: "
          << (trs - correct) / trs << " uas: " << (correct_heads / total_heads)
          << "\t[" << corpus_size << " sents in "
-         << chrono::duration<double, std::milli>(t_end - t_start).count()
-         << " ms]" << endl;
+         << chrono::duration<double, milli>(t_end - t_start).count() << " ms]"
+         << endl;
   } else {
     cerr << "Parsed " << corpus_size << " sentences in "
-         << chrono::duration<double, std::milli>(t_end - t_start).count()
+         << chrono::duration<double, milli>(t_end - t_start).count()
          << "milliseconds." << endl;
   }
 }

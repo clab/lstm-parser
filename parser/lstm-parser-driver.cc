@@ -181,13 +181,14 @@ int main(int argc, char** argv) {
 
   if (train) {
     signal(SIGINT, signal_callback_handler);
-    Corpus training_corpus(conf["training_data"].as<string>(),
-                           &parser.vocab, true);
+    TrainingCorpus training_corpus(&parser.vocab,
+                                   conf["training_data"].as<string>(), true);
     parser.FinalizeVocab();
     cerr << "Total number of words: " << training_corpus.vocab->CountWords()
          << endl;
     // OOV words will be replaced by UNK tokens
-    Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab, false);
+    TrainingCorpus dev_corpus(&parser.vocab, conf["dev_data"].as<string>(),
+                              false);
 
     ostringstream os;
     os << "parser_" << (parser.options.use_pos ? "pos" : "nopos")
@@ -206,13 +207,14 @@ int main(int argc, char** argv) {
     parser.Train(training_corpus, dev_corpus, unk_prob, fname, compress,
                  &requested_stop);
     if (test) { // do test evaluation
-      parser.Test(dev_corpus, true);
+      parser.Evaluate(dev_corpus);
     }
   }
   else if (test) { // actually run the parser
     // TODO: make this run parser on test data.
     parser.FinalizeVocab();
-    Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab, false);
+    TrainingCorpus dev_corpus(&parser.vocab, conf["dev_data"].as<string>(),
+                              false);
     parser.Test(dev_corpus);
   }
 

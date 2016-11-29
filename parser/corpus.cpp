@@ -14,7 +14,8 @@ namespace lstm_parser {
 const string CorpusVocabulary::UNK = "<UNK>";
 const string CorpusVocabulary::BAD0 = "<BAD0>";
 
-void Corpus::CountSingletons() {
+
+void TrainingCorpus::CountSingletons() {
   // compute the singletons in the parser's training data
   map<unsigned, unsigned> counts;
   for (const auto& sent : sentences) {
@@ -28,7 +29,8 @@ void Corpus::CountSingletons() {
   }
 }
 
-void Corpus::load_correct_actions(const string& file, bool is_training) {
+
+void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
   // TODO: break up this function?
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;
@@ -205,7 +207,6 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
   if (is_training) {  // compute the singletons in the parser's training data
     CountSingletons();
   }
-
 }
 
 } // namespace lstm_parser

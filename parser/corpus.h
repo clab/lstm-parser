@@ -60,8 +60,16 @@ public:
     return word_id;
   }
 
-private:
-  friend class boost::serialization::access;
+  static inline unsigned GetOrAddEntry(const std::string& str, StrToIntMap* map,
+                                       std::vector<std::string>* indexed_list) {
+    // assert(intToWords.size() == wordsToInt.size());
+    auto entry_iter = map->find(str);
+    if (entry_iter == map->end()) {
+      return AddEntry(str, map, indexed_list);
+    } else {
+      return entry_iter->second;
+    }
+  }
 
   static inline std::string GetLabelForAction(const std::string& action) {
     if (boost::starts_with(action, "RIGHT-ARC") ||
@@ -74,6 +82,9 @@ private:
       return "NONE";
     }
   }
+
+private:
+  friend class boost::serialization::access;
 
   template<class Archive, class VocabType>
   // Shared code: serialize the number-to-string mappings, from which the
@@ -131,49 +142,54 @@ private:
     indexed_list->push_back(str);
     return new_id;
   }
+};
 
-  static inline unsigned GetOrAddEntry(const std::string& str, StrToIntMap* map,
-                                       std::vector<std::string>* indexed_list) {
-    // assert(intToWords.size() == wordsToInt.size());
-    auto entry_iter = map->find(str);
-    if (entry_iter == map->end()) {
-      return AddEntry(str, map, indexed_list);
-    } else {
-      return entry_iter->second;
-    }
-  }
+
+class Corpus; // forward declaration
+
+class CorpusReader {
+public:
+  virtual void ReadSentences(const std::string& file, Corpus* corpus) const = 0;
+  virtual ~CorpusReader() {};
 };
 
 
 class Corpus {
-  // typedef std::unordered_map<std::string, unsigned,
-  //                            std::hash<std::string> > Map;
-  // typedef std::unordered_map<unsigned, std::string,
-  //                            std::hash<std::string> > ReverseMap;
 public:
-  bool USE_SPELLING = false;
-
-  std::vector<std::vector<unsigned>> correct_act_sent;
   std::vector<std::vector<unsigned>> sentences;
   std::vector<std::vector<unsigned>> sentences_pos;
   std::vector<std::vector<std::string>> sentences_surface_forms;
-  std::set<unsigned> singletons;
+  CorpusVocabulary* vocab;
 
-  /*
-  std::map<unsigned,unsigned>* headsTraining;
-  std::map<unsigned,std::string>* labelsTraining;
-
-  std::map<unsigned,unsigned>*  headsParsing;
-  std::map<unsigned,std::string>* labelsParsing;
-  //*/
-
-  CorpusVocabulary *vocab;
-
-  Corpus(const std::string& file, CorpusVocabulary* vocab, bool is_training) :
+  Corpus(CorpusVocabulary* vocab, const CorpusReader& reader,
+         const std::string& file) :
       vocab(vocab) {
-    load_correct_actions(file, is_training);
+    reader.ReadSentences(file, this);
   }
 
+protected:
+  // Corpus for subclasses to inherit and use. Subclasses are then responsible
+  // for doing any corpus-reading or setup.
+  Corpus(CorpusVocabulary* vocab) : vocab(vocab) {}
+
+};
+
+
+class TrainingCorpus : public Corpus {
+public:
+  friend class OracleTransitionsCorpusReader;
+
+  bool USE_SPELLING = false;
+
+  std::vector<std::vector<unsigned>> correct_act_sent;
+  std::set<unsigned> singletons;
+
+  TrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
+                 bool is_training) :
+      Corpus(vocab) {
+    OracleTransitionsCorpusReader reader(is_training);
+    reader.ReadSentences(file, this);
+  }
 
   inline unsigned UTF8Len(unsigned char x) {
     if (x < 0x80) return 1;
@@ -186,7 +202,20 @@ public:
   }
 
 private:
-  void load_correct_actions(const std::string& file, bool is_training);
+  class OracleTransitionsCorpusReader : public CorpusReader {
+  public:
+    OracleTransitionsCorpusReader(bool is_training) :
+        is_training(is_training) {}
+    virtual void ReadSentences(const std::string& file, Corpus* corpus) const {
+      TrainingCorpus* training_corpus = static_cast<TrainingCorpus *>(corpus);
+      training_corpus->LoadCorrectActions(file, is_training);
+    }
+    virtual ~OracleTransitionsCorpusReader() {};
+  private:
+    bool is_training;
+  };
+
+  void LoadCorrectActions(const std::string& file, bool is_training);
 
   static inline void ReplaceStringInPlace(std::string& subject,
                                           const std::string& search,

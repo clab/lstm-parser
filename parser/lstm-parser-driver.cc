@@ -214,7 +214,6 @@ int main(int argc, char** argv) {
     parser.FinalizeVocab();
     Corpus dev_corpus(conf["dev_data"].as<string>(), &parser.vocab, false);
     parser.Test(dev_corpus);
-
   }
 
   /*

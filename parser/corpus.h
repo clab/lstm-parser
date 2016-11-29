@@ -73,7 +73,6 @@ private:
     } else {
       return "NONE";
     }
-
   }
 
   template<class Archive, class VocabType>
@@ -110,7 +109,7 @@ private:
                 << " words when loading model" << std::endl;
     }
 
-    // Now reconstruct the reverse mappings.
+    // Now reconstruct the reverse mappings...
     for (size_t i = 0; i < int_to_words.size(); ++i)
       words_to_int[int_to_words[i]] = i;
     for (size_t i = 0; i < int_to_pos.size(); ++i)
@@ -118,7 +117,7 @@ private:
     for (size_t i = 0; i < int_to_chars.size(); ++i)
       chars_to_int[int_to_chars[i]] = i;
 
-    // ...and reconstruct the arc labels.
+    // ...and the arc labels.
     for (const std::string& action : actions) {
       actions_to_arc_labels.push_back(GetLabelForAction(action));
     }

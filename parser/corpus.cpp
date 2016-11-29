@@ -43,9 +43,6 @@ void Corpus::load_correct_actions(const string& file, bool is_training) {
   vector<unsigned> current_sent_pos;
   vector<string> current_sent_surface_strs;
   while (getline(actionsFile, lineS)) {
-    //istringstream iss(line);
-    //string lineS;
-    //iss >> lineS;
     ReplaceStringInPlace(lineS, "-RRB-", "_RRB_");
     ReplaceStringInPlace(lineS, "-LRB-", "_LRB_");
     // An empty line marks the end of a sentence.

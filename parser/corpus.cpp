@@ -6,6 +6,7 @@
 #include <iostream>
 #include <iterator>
 #include <sstream>
+#include <string>
 
 using namespace std;
 
@@ -13,6 +14,61 @@ namespace lstm_parser {
 
 const string CorpusVocabulary::UNK = "<UNK>";
 const string CorpusVocabulary::BAD0 = "<BAD0>";
+
+
+void ConllUCorpusReader::ReadSentences(const string& file,
+                                       Corpus* corpus) const {
+  string next_line;
+  vector<string> current_sentence_unk_surface_forms;
+  vector<unsigned> current_sentence;
+  vector<unsigned> current_sentence_pos;
+
+  ifstream conll_file(file);
+  unsigned unk_word = corpus->vocab->GetWord(CorpusVocabulary::UNK);
+  while(conll_file) {
+    getline(conll_file, next_line);
+    if (next_line.empty()) {
+      if (!current_sentence.empty()) { // just in case we get 2 blank lines
+        corpus->sentences.push_back(move(current_sentence));
+        current_sentence.clear();
+
+        corpus->sentences_pos.push_back(move(current_sentence_pos));
+        current_sentence_pos.clear();
+
+        corpus->sentences_unk_surface_forms.push_back(
+            move(current_sentence_unk_surface_forms));
+        current_sentence_unk_surface_forms.clear();
+      }
+      continue;
+    }
+    else if (next_line[0] == '#') {
+      // TODO: carry over comment lines, as required by CoNLL-U format spec?
+      continue;
+    }
+
+    istringstream line_stream(next_line);
+    unsigned token_id;
+    string surface_form;
+    string pos;
+    string dummy;
+    line_stream >> token_id;
+    if (token_id < current_sentence.size() + 1) {
+      throw ConllFormatException(
+          "Format error in file " + file + ": expected token ID at least "
+          + to_string(current_sentence.size() + 1) + "; got "
+          + to_string(token_id));
+    }
+    // TODO: Preserve token IDs somehow? (Sometimes some are skipped for punct.)
+    line_stream >> surface_form >> dummy >> dummy // skip lemma and xposttag
+                >> pos; // skip the rest of the line
+
+    unsigned word_id = corpus->vocab->GetWord(surface_form);
+    current_sentence_unk_surface_forms.push_back(
+        word_id == unk_word ? surface_form : "");
+    current_sentence.push_back(word_id);
+    current_sentence_pos.push_back(corpus->vocab->GetPOS(pos));
+  }
+}
 
 
 void TrainingCorpus::CountSingletons() {
@@ -30,6 +86,7 @@ void TrainingCorpus::CountSingletons() {
 }
 
 
+// TODO: Move into reader class
 void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
   // TODO: break up this function?
   cerr << "Loading " << (is_training ? "training" : "dev")
@@ -43,7 +100,7 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
 
   vector<unsigned> current_sent;
   vector<unsigned> current_sent_pos;
-  vector<string> current_sent_surface_strs;
+  vector<string> current_sent_unk_surface_strs;
   while (getline(actionsFile, lineS)) {
     ReplaceStringInPlace(lineS, "-RRB-", "_RRB_");
     ReplaceStringInPlace(lineS, "-LRB-", "_LRB_");
@@ -57,8 +114,9 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
         sentences_pos.push_back({});
         sentences_pos.back().swap(current_sent_pos);
         if (!is_training) {
-          sentences_surface_forms.push_back({});
-          sentences_surface_forms.back().swap(current_sent_surface_strs);
+          sentences_unk_surface_forms.push_back({});
+          sentences_unk_surface_forms.back().swap(
+              current_sent_unk_surface_strs);
         }
       }
       start_of_sentence = true;
@@ -123,15 +181,15 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
             // OOV word
             if (USE_SPELLING) {
               word_id = vocab->GetOrAddWord(word); // don't record as training
-              current_sent_surface_strs.push_back("");
+              current_sent_unk_surface_strs.push_back("");
             } else {
               auto word_iter = vocab->words_to_int.find(word);
               if (word_iter == vocab->words_to_int.end()) {
                 // Save the surface form of this OOV.
-                current_sent_surface_strs.push_back(word);
+                current_sent_unk_surface_strs.push_back(word);
                 word_id = vocab->words_to_int[vocab->UNK];
               } else {
-                current_sent_surface_strs.push_back("");
+                current_sent_unk_surface_strs.push_back("");
                 word_id = word_iter->second;
               }
             }
@@ -182,7 +240,8 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
     sentences.push_back(move(current_sent));
     sentences_pos.push_back(move(current_sent_pos));
     if (!is_training) {
-      sentences_surface_forms.push_back(move(current_sent_surface_strs));
+      sentences_unk_surface_forms.push_back(
+          move(current_sent_unk_surface_strs));
     }
   }
 

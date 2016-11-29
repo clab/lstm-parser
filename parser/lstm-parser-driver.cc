@@ -50,6 +50,8 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
          "List of transitions - training corpus")
         ("dev_data,d", po::value<string>(), "Development corpus path")
         ("test_data,T", po::value<string>(), "Test corpus path")
+        ("input_format,f", po::value<string>()->default_value("conll"),
+         "Test corpus input format: currently supports only 'conll'")
         ("unk_strategy,o", po::value<unsigned>()->default_value(1),
          "Unknown word strategy: 1 = singletons become UNK with probability"
          " unk_prob")
@@ -81,13 +83,7 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   po::store(parse_command_line(argc, argv, dcmdline_options), *conf);
   if (conf->count("help")) {
     cerr << dcmdline_options << endl;
-    exit(1);
-  }
-  if (conf->count("training_data") == 0) {
-    cerr << "Please specify --training_data (-t): this is required to determine"
-            " the vocabulary mapping, even if the parser is used in prediction"
-            " mode.\n";
-    exit(1);
+    exit(0);
   }
 }
 
@@ -211,11 +207,19 @@ int main(int argc, char** argv) {
     }
   }
   else if (test) { // actually run the parser
-    // TODO: make this run parser on test data.
     parser.FinalizeVocab();
-    TrainingCorpus dev_corpus(&parser.vocab, conf["dev_data"].as<string>(),
-                              false);
-    parser.Test(dev_corpus);
+    // Set up reader as pointer to make it easier to add different reader types
+    // later.
+    unique_ptr<CorpusReader> reader;
+    if (conf["input_format"].as<string>() == "conll") {
+      reader.reset(new ConllUCorpusReader());
+    } else {
+      cerr << "Unrecognized input format: " << conf["input_format"].as<string>()
+           << endl;
+      exit(1);
+    }
+    Corpus test_corpus(&parser.vocab, *reader, conf["test_data"].as<string>());
+    parser.Test(test_corpus);
   }
 
   /*

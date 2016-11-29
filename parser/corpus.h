@@ -3,6 +3,7 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/serialization/split_member.hpp>
+#include <exception>
 #include <stddef.h>
 #include <iostream>
 #include <map>
@@ -46,6 +47,24 @@ public:
   inline unsigned CountChars() { return chars_to_int.size(); }
   inline unsigned CountActions() { return actions.size(); }
 
+  inline unsigned GetWord(const std::string& word) const {
+    auto word_iter = words_to_int.find(word);
+    if (word_iter == words_to_int.end()) {
+      return words_to_int.find(CorpusVocabulary::UNK)->second;
+    } else {
+      return word_iter->second;
+    }
+  }
+
+  inline unsigned GetPOS(const std::string& word) const {
+    auto pos_iter = pos_to_int.find(word);
+    if (pos_iter == pos_to_int.end()) {
+      return -1;
+    } else {
+      return pos_iter->second;
+    }
+  }
+
   inline unsigned GetOrAddWord(const std::string& word,
                                bool record_as_training=false) {
     unsigned num_words = CountWords();
@@ -54,8 +73,8 @@ public:
       int_to_training_word.push_back(record_as_training);
     } else {
       // Should get optimized out when record_as_training is literal false.
-      int_to_training_word[word_id] = int_to_training_word[word_id]
-          || record_as_training;
+      int_to_training_word[word_id] =
+          (int_to_training_word[word_id] || record_as_training);
     }
     return word_id;
   }
@@ -154,11 +173,23 @@ public:
 };
 
 
+class ConllUCorpusReader : public CorpusReader {
+public:
+  class ConllFormatException : public std::logic_error {
+  public:
+    ConllFormatException(const std::string& what) : std::logic_error(what) {}
+  };
+
+  virtual void ReadSentences(const std::string& file, Corpus* corpus) const;
+  virtual ~ConllUCorpusReader() {};
+};
+
+
 class Corpus {
 public:
   std::vector<std::vector<unsigned>> sentences;
   std::vector<std::vector<unsigned>> sentences_pos;
-  std::vector<std::vector<std::string>> sentences_surface_forms;
+  std::vector<std::vector<std::string>> sentences_unk_surface_forms;
   CorpusVocabulary* vocab;
 
   Corpus(CorpusVocabulary* vocab, const CorpusReader& reader,

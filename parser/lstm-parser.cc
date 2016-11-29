@@ -612,7 +612,7 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate) {
     const vector<unsigned>& sentence = corpus.sentences[sii];
     const vector<unsigned>& sentence_pos = corpus.sentences_pos[sii];
     const vector<std::string>& sentence_unk_str =
-        corpus.sentences_surface_forms[sii];
+        corpus.sentences_unk_surface_forms[sii];
     ParseTree hyp = Parse(sentence, sentence_pos, vocab, true, &correct);
     OutputConll(sentence, sentence_pos, sentence_unk_str,
                 corpus.vocab->int_to_words, corpus.vocab->int_to_pos,
@@ -643,7 +643,7 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate) {
   } else {
     cerr << "Parsed " << corpus_size << " sentences in "
          << chrono::duration<double, milli>(t_end - t_start).count()
-         << "milliseconds." << endl;
+         << " milliseconds." << endl;
   }
 }
 
@@ -655,10 +655,10 @@ void LSTMParser::OutputConll(const vector<unsigned>& sentence,
                              const vector<string>& int_to_pos,
                              const map<string, unsigned>& words_to_int,
                              const ParseTree& tree) {
+  const unsigned int unk_word =
+      words_to_int.find(CorpusVocabulary::UNK)->second;
   for (unsigned i = 0; i < (sentence.size() - 1); ++i) {
     auto index = i + 1;
-    const unsigned int unk_word =
-        words_to_int.find(CorpusVocabulary::UNK)->second;
     assert(i < sentence_unk_strings.size() &&
            ((sentence[i] == unk_word && sentence_unk_strings[i].size() > 0) ||
             (sentence[i] != unk_word && sentence_unk_strings[i].size() == 0 &&

@@ -196,7 +196,8 @@ protected:
                                  const ParseTree& hyp) const {
     assert(ref.sentence.size() == hyp.sentence.size());
     unsigned correct_count = 0;
-    for (unsigned i = 0; i < ref.sentence.size(); ++i) {
+    // Ignore last element of sentence, because (TODO: why is this ignored??).
+    for (unsigned i = 0; i < ref.sentence.size() - 1; ++i) {
       if (ref.GetParents()[i] == hyp.GetParents()[i])
         ++correct_count;
     }

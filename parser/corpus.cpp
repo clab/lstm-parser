@@ -222,9 +222,9 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
             corpus->correct_act_sent.back().push_back(action_index);
         } else {
           // TODO: right now, new actions which haven't been observed in
-          // training are not added to correct_act_sent. In dev/test, this may
+          // training are not added to correct_act_sent. In dev, this may
           // be a problem if there is little training data.
-          cerr << "WARNING: encountered unknown transition in dev/test: "
+          cerr << "WARNING: encountered unknown transition in dev corpus: "
                << lineS << endl;
           if (start_of_sentence)
             corpus->correct_act_sent.push_back({});

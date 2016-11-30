@@ -36,7 +36,7 @@ void LSTMParser::LoadPretrainedWords(const string& words_path) {
     cout << "..." << endl;
     cerr << "ERROR: failed to open word vectors file " << words_path
          << "; exiting" << endl;
-    exit(1);
+    abort();
   }
   // Read header
   string line;
@@ -67,7 +67,6 @@ void LSTMParser::LoadPretrainedWords(const string& words_path) {
 
 
 void LSTMParser::FinalizeVocab() {
-  // assert (!finalized);
   if (finalized)
     return;
 
@@ -600,7 +599,12 @@ ParseTree LSTMParser::Parse(const vector<unsigned>& sentence,
 }
 
 
-void LSTMParser::DoTest(const Corpus& corpus, bool evaluate) {
+void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
+                        bool output_parses) {
+  if (!output_parses) {
+    // Show a message so they know something's happening.
+    cerr << "Parsing sentences..." << endl;
+  }
   double llh = 0;
   double trs = 0;
   double correct = 0;
@@ -614,9 +618,11 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate) {
     const vector<std::string>& sentence_unk_str =
         corpus.sentences_unk_surface_forms[sii];
     ParseTree hyp = Parse(sentence, sentence_pos, vocab, true, &correct);
-    OutputConll(sentence, sentence_pos, sentence_unk_str,
-                corpus.vocab->int_to_words, corpus.vocab->int_to_pos,
-                corpus.vocab->words_to_int, hyp);
+    if (output_parses) {
+      OutputConll(sentence, sentence_pos, sentence_unk_str,
+                  corpus.vocab->int_to_words, corpus.vocab->int_to_pos,
+                  corpus.vocab->words_to_int, hyp);
+    }
 
     if (evaluate) {
       // Downcast to TrainingCorpus to get gold-standard data. We can only get

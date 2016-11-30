@@ -155,11 +155,11 @@ public:
              bool compress, const volatile bool* requested_stop = nullptr);
 
   void Test(const Corpus& corpus) {
-    DoTest(corpus, false);
+    DoTest(corpus, false, true);
   }
 
-  void Evaluate(const TrainingCorpus& corpus) {
-    DoTest(corpus, true);
+  void Evaluate(const TrainingCorpus& corpus, bool output_parses=false) {
+    DoTest(corpus, true, output_parses);
   }
 
   // Used for testing. Replaces OOV with UNK.
@@ -214,7 +214,7 @@ private:
     ar & model;
   }
 
-  void DoTest(const Corpus& corpus, bool evaluate);
+  void DoTest(const Corpus& corpus, bool evaluate, bool output_parses);
 
   static void OutputConll(const std::vector<unsigned>& sentence,
                           const std::vector<unsigned>& pos,

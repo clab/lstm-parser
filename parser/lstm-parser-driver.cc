@@ -74,8 +74,8 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
         ("lstm_input_dim", po::value<unsigned>()->default_value(60),
          "LSTM input dimension")
         ("train,r", "Whether training should be run")
-        ("test,e", "Whether the model should be tested."
-                   " If train is true, this tests on dev data.")
+        ("test,s", "Whether the model should be tested on test_data.")
+        ("evaluate,e", "Whether to evaluate the trained model on dev_data.")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
         ("help,h", "Help");
   po::options_description dcmdline_options;
@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
   const double unk_prob = conf["unk_prob"].as<double>();
   const bool train = conf.count("train");
   const bool test = conf.count("test");
+  const bool evaluate = conf.count("evaluate");
   const bool compress = conf.count("compress");
   const bool load_model = conf.count("model");
 
@@ -140,8 +141,8 @@ int main(int argc, char** argv) {
          << endl;
     abort();
   }
-  // If we're testing, we have to either be loading or training a model.
-  if (test && !load_model && !train) {
+  // If we're testing/evaluating, we have to either be loading or training a model.
+  if ((test || evaluate) && !load_model && !train) {
     cerr << "No model specified for testing!" << endl;
     abort();
   }
@@ -170,12 +171,20 @@ int main(int argc, char** argv) {
       // TODO: make this recognize the difference between a default option and
       // one that was actually specified on the command line, and only warn for
       // the latter.
-      cerr << "WARNING: overriding command line network options with saved"
-              " options" << endl;
+      cerr << "WARNING: overriding command line neural network options with"
+              " options saved in model" << endl;
     }
   }
 
+  unique_ptr<TrainingCorpus> dev_corpus; // shared by train/evaluate
+
   if (train) {
+    if (!conf.count("training_data") || !conf.count("dev_data")) {
+      cerr << "Training requested, but training and dev data were not both"
+              " specified!" << endl;
+      abort();
+    }
+
     signal(SIGINT, signal_callback_handler);
     TrainingCorpus training_corpus(&parser.vocab,
                                    conf["training_data"].as<string>(), true);
@@ -183,8 +192,8 @@ int main(int argc, char** argv) {
     cerr << "Total number of words: " << training_corpus.vocab->CountWords()
          << endl;
     // OOV words will be replaced by UNK tokens
-    TrainingCorpus dev_corpus(&parser.vocab, conf["dev_data"].as<string>(),
-                              false);
+    dev_corpus.reset(new TrainingCorpus(&parser.vocab,
+                                        conf["dev_data"].as<string>(), false));
 
     ostringstream os;
     os << "parser_" << (parser.options.use_pos ? "pos" : "nopos")
@@ -200,13 +209,32 @@ int main(int argc, char** argv) {
       os << ".gz";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    parser.Train(training_corpus, dev_corpus, unk_prob, fname, compress,
+    parser.Train(training_corpus, *dev_corpus, unk_prob, fname, compress,
                  &requested_stop);
-    if (test) { // do test evaluation
-      parser.Evaluate(dev_corpus);
-    }
   }
-  else if (test) { // actually run the parser
+
+  if (evaluate) {
+    if (!conf.count("dev_data")) {
+      cerr << "Evaluation requested, but no dev data was specified!" << endl;
+      abort();
+    }
+
+    parser.FinalizeVocab();
+    cerr << "Evaluating model on " << conf["dev_data"].as<string>() << endl;
+    if (!train) { // Didn't already load dev corpus for training
+      dev_corpus.reset(
+          new TrainingCorpus(&parser.vocab, conf["dev_data"].as<string>(),
+                             false));
+    }
+    parser.Evaluate(*dev_corpus);
+  }
+
+  if (test) { // actually run the parser on test data
+    if (!conf.count("test_data")) {
+      cerr << "Test requested, but no test data was specified!" << endl;
+      abort();
+    }
+
     parser.FinalizeVocab();
     // Set up reader as pointer to make it easier to add different reader types
     // later.
@@ -216,7 +244,7 @@ int main(int argc, char** argv) {
     } else {
       cerr << "Unrecognized input format: " << conf["input_format"].as<string>()
            << endl;
-      exit(1);
+      abort();
     }
     Corpus test_corpus(&parser.vocab, *reader, conf["test_data"].as<string>());
     parser.Test(test_corpus);

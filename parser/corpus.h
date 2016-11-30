@@ -222,31 +222,33 @@ public:
     reader.ReadSentences(file, this);
   }
 
-  inline unsigned UTF8Len(unsigned char x) {
-    if (x < 0x80) return 1;
-    else if ((x >> 5) == 0x06) return 2;
-    else if ((x >> 4) == 0x0e) return 3;
-    else if ((x >> 3) == 0x1e) return 4;
-    else if ((x >> 2) == 0x3e) return 5;
-    else if ((x >> 1) == 0x7e) return 6;
-    else return 0;
-  }
-
 private:
   class OracleTransitionsCorpusReader : public CorpusReader {
   public:
     OracleTransitionsCorpusReader(bool is_training) :
         is_training(is_training) {}
+
     virtual void ReadSentences(const std::string& file, Corpus* corpus) const {
       TrainingCorpus* training_corpus = static_cast<TrainingCorpus *>(corpus);
-      training_corpus->LoadCorrectActions(file, is_training);
+      LoadCorrectActions(file, training_corpus);
     }
+
     virtual ~OracleTransitionsCorpusReader() {};
+
+    static inline unsigned UTF8Len(unsigned char x) {
+      if (x < 0x80) return 1;
+      else if ((x >> 5) == 0x06) return 2;
+      else if ((x >> 4) == 0x0e) return 3;
+      else if ((x >> 3) == 0x1e) return 4;
+      else if ((x >> 2) == 0x3e) return 5;
+      else if ((x >> 1) == 0x7e) return 6;
+      else return 0;
+    }
   private:
     bool is_training;
+    void LoadCorrectActions(const std::string& file,
+                            TrainingCorpus* corpus) const;
   };
-
-  void LoadCorrectActions(const std::string& file, bool is_training);
 
   static inline void ReplaceStringInPlace(std::string& subject,
                                           const std::string& search,

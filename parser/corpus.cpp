@@ -86,13 +86,14 @@ void TrainingCorpus::CountSingletons() {
 }
 
 
-// TODO: Move into reader class
-void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
+void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
+    const string& file, TrainingCorpus* corpus) const {
   // TODO: break up this function?
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;
   ifstream actionsFile(file);
   string lineS;
+  CorpusVocabulary* vocab = corpus->vocab;
 
   bool next_is_action_line = false;
   bool start_of_sentence = false;
@@ -109,13 +110,13 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
       next_is_action_line = false;
       if (!first) { // first line is blank, but no sentence yet
         // Store the sentence variables and clear them for the next sentence.
-        sentences.push_back({});
-        sentences.back().swap(current_sent);
-        sentences_pos.push_back({});
-        sentences_pos.back().swap(current_sent_pos);
+        corpus->sentences.push_back({});
+        corpus->sentences.back().swap(current_sent);
+        corpus->sentences_pos.push_back({});
+        corpus->sentences_pos.back().swap(current_sent_pos);
         if (!is_training) {
-          sentences_unk_surface_forms.push_back({});
-          sentences_unk_surface_forms.back().swap(
+          corpus->sentences_unk_surface_forms.push_back({});
+          corpus->sentences_unk_surface_forms.back().swap(
               current_sent_unk_surface_strs);
         }
       }
@@ -179,7 +180,7 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
             // add an empty string for any token except OOVs (it is easy to
             // recover the surface form of non-OOV using intToWords(id)).
             // OOV word
-            if (USE_SPELLING) {
+            if (corpus->USE_SPELLING) {
               word_id = vocab->GetOrAddWord(word); // don't record as training
               current_sent_unk_surface_strs.push_back("");
             } else {
@@ -205,9 +206,9 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
       if (action_iter != vocab->actions.end()) {
         unsigned action_index = distance(vocab->actions.begin(), action_iter);
         if (start_of_sentence)
-          correct_act_sent.push_back({action_index});
+          corpus->correct_act_sent.push_back({action_index});
         else
-          correct_act_sent.back().push_back(action_index);
+          corpus->correct_act_sent.back().push_back(action_index);
       } else { // A not-previously-seen action
         if (is_training) {
           vocab->actions.push_back(lineS);
@@ -216,9 +217,9 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
 
           unsigned action_index = vocab->actions.size() - 1;
           if (start_of_sentence)
-            correct_act_sent.push_back({action_index});
+            corpus->correct_act_sent.push_back({action_index});
           else
-            correct_act_sent.back().push_back(action_index);
+            corpus->correct_act_sent.back().push_back(action_index);
         } else {
           // TODO: right now, new actions which haven't been observed in
           // training are not added to correct_act_sent. In dev/test, this may
@@ -226,7 +227,7 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
           cerr << "WARNING: encountered unknown transition in dev/test: "
                << lineS << endl;
           if (start_of_sentence)
-            correct_act_sent.push_back({});
+            corpus->correct_act_sent.push_back({});
         }
       }
       start_of_sentence = false;
@@ -237,10 +238,10 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
 
   // Add the last sentence.
   if (current_sent.size() > 0) {
-    sentences.push_back(move(current_sent));
-    sentences_pos.push_back(move(current_sent_pos));
+    corpus->sentences.push_back(move(current_sent));
+    corpus->sentences_pos.push_back(move(current_sent_pos));
     if (!is_training) {
-      sentences_unk_surface_forms.push_back(
+      corpus->sentences_unk_surface_forms.push_back(
           move(current_sent_unk_surface_strs));
     }
   }
@@ -264,7 +265,7 @@ void TrainingCorpus::LoadCorrectActions(const string& file, bool is_training) {
   }
 
   if (is_training) {  // compute the singletons in the parser's training data
-    CountSingletons();
+    corpus->CountSingletons();
   }
 }
 

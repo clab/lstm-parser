@@ -14,6 +14,7 @@ namespace lstm_parser {
 
 const string CorpusVocabulary::UNK = "<UNK>";
 const string CorpusVocabulary::BAD0 = "<BAD0>";
+const string CorpusVocabulary::ROOT = "ROOT";
 
 
 void ConllUCorpusReader::ReadSentences(const string& file,
@@ -25,10 +26,16 @@ void ConllUCorpusReader::ReadSentences(const string& file,
 
   ifstream conll_file(file);
   unsigned unk_word = corpus->vocab->GetWord(CorpusVocabulary::UNK);
+  unsigned root_symbol = corpus->vocab->GetWord(CorpusVocabulary::ROOT);
+  unsigned root_pos_symbol = corpus->vocab->GetPOS(CorpusVocabulary::ROOT);
   while(conll_file) {
     getline(conll_file, next_line);
     if (next_line.empty()) {
       if (!current_sentence.empty()) { // just in case we get 2 blank lines
+        current_sentence.push_back(root_symbol);
+        current_sentence_pos.push_back(root_pos_symbol);
+        current_sentence_unk_surface_forms.push_back("");
+
         corpus->sentences.push_back(move(current_sentence));
         current_sentence.clear();
 

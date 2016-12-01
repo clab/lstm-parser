@@ -22,6 +22,7 @@ public:
   // String literals
   static const std::string UNK;
   static const std::string BAD0;
+  static const std::string ROOT;
 
   StrToIntMap words_to_int;
   std::vector<std::string> int_to_words;

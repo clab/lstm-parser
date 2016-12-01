@@ -25,8 +25,6 @@ namespace io = boost::iostreams;
 
 namespace lstm_parser {
 
-constexpr const char* LSTMParser::ROOT_SYMBOL;
-
 
 void LSTMParser::LoadPretrainedWords(const string& words_path) {
   cerr << "Loading word vectors from " << words_path;
@@ -120,11 +118,10 @@ void LSTMParser::FinalizeVocab() {
 
 
 LSTMParser::LSTMParser(const ParserOptions& poptions,
-                             const string& pretrained_words_path,
-                             bool finalize) :
+                       const string& pretrained_words_path, bool finalize) :
       options(poptions),
       kUNK(vocab.GetOrAddWord(vocab.UNK)),
-      kROOT_SYMBOL(vocab.GetOrAddWord(ROOT_SYMBOL)),
+      kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)),
       stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
                  &model),
       buffer_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,

@@ -93,8 +93,6 @@ private:
 class LSTMParser {
 public:
   // TODO: make some of these members non-public
-  static constexpr const char* ROOT_SYMBOL = "ROOT";
-
   ParserOptions options;
   CorpusVocabulary vocab;
   cnn::Model model;
@@ -196,7 +194,7 @@ protected:
                                  const ParseTree& hyp) const {
     assert(ref.sentence.size() == hyp.sentence.size());
     unsigned correct_count = 0;
-    // Ignore last element of sentence, because (TODO: why is this ignored??).
+    // Ignore last element of sentence, which is always ROOT.
     for (unsigned i = 0; i < ref.sentence.size() - 1; ++i) {
       if (ref.GetParents()[i] == hyp.GetParents()[i])
         ++correct_count;

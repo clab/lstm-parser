@@ -29,8 +29,8 @@ constexpr const char* LSTMParser::ROOT_SYMBOL;
 
 
 void LSTMParser::LoadPretrainedWords(const string& words_path) {
-  std::cerr << "Loading word vectors from " << words_path;
-  std::ifstream in;
+  cerr << "Loading word vectors from " << words_path;
+  ifstream in;
   in.open(words_path);
   if (!in) {
     cout << "..." << endl;
@@ -175,7 +175,7 @@ bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
 ParseTree LSTMParser::RecoverParseTree(
     const vector<unsigned>& sentence, const vector<unsigned>& actions,
     const vector<string>& action_names,
-    const std::vector<std::string>& actions_to_arc_labels, bool labeled) {
+    const vector<string>& actions_to_arc_labels, bool labeled) {
   ParseTree tree(sentence, labeled);
   vector<int> bufferi(sentence.size() + 1, 0), stacki(1, -999);
   for (unsigned i = 0; i < sentence.size(); ++i)
@@ -221,7 +221,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     const vector<unsigned>& raw_sent,  // raw sentence
     const vector<unsigned>& sent,  // sentence with OOVs replaced
     const vector<unsigned>& sent_pos, const vector<unsigned>& correct_actions,
-    const vector<string>& action_names, const vector<std::string>& int_to_words,
+    const vector<string>& action_names, const vector<string>& int_to_words,
     double* correct) {
   // TODO: break up this function?
   assert(finalized);
@@ -472,8 +472,8 @@ void LSTMParser::Train(const TrainingCorpus& corpus,
   double llh = 0;
   bool first = true;
   int iter = -1;
-  time_t time_start = std::chrono::system_clock::to_time_t(
-      std::chrono::system_clock::now());
+  time_t time_start = chrono::system_clock::to_time_t(
+      chrono::system_clock::now());
   cerr << "TRAINING STARTED AT: " << put_time(localtime(&time_start), "%c %Z")
        << endl;
 
@@ -520,8 +520,8 @@ void LSTMParser::Train(const TrainingCorpus& corpus,
       trs += actions.size();
     }
     sgd.status();
-    time_t time_now = std::chrono::system_clock::to_time_t(
-        std::chrono::system_clock::now());
+    time_t time_now = chrono::system_clock::to_time_t(
+        chrono::system_clock::now());
     cerr << "update #" << iter << " (epoch " << (tot_seen / num_sentences)
          << " |time=" << put_time(localtime(&time_now), "%c %Z") << ")\tllh: "
          << llh << " ppl: " << exp(llh / trs) << " err: "
@@ -538,7 +538,7 @@ void LSTMParser::Train(const TrainingCorpus& corpus,
       double correct = 0;
       double correct_heads = 0;
       double total_heads = 0;
-      auto t_start = std::chrono::high_resolution_clock::now();
+      auto t_start = chrono::high_resolution_clock::now();
       for (unsigned sii = 0; sii < dev_size; ++sii) {
         const vector<unsigned>& sentence = dev_corpus.sentences[sii];
         const vector<unsigned>& sentence_pos = dev_corpus.sentences_pos[sii];
@@ -554,13 +554,13 @@ void LSTMParser::Train(const TrainingCorpus& corpus,
         correct_heads += ComputeCorrect(ref, hyp);
         total_heads += sentence.size() - 1;
       }
-      auto t_end = std::chrono::high_resolution_clock::now();
+      auto t_end = chrono::high_resolution_clock::now();
       cerr << "  **dev (iter=" << iter << " epoch="
            << (tot_seen / num_sentences) << ")\tllh=" << llh << " ppl: "
            << exp(llh / trs) << " err: " << (trs - correct) / trs << " uas: "
            << (correct_heads / total_heads) << "\t[" << dev_size << " sents in "
-           << std::chrono::duration<double, std::milli>(t_end - t_start).count()
-           << " ms]" << endl;
+           << chrono::duration<double, milli>(t_end - t_start).count() << " ms]"
+           << endl;
       if (correct_heads > best_correct_heads) {
         best_correct_heads = correct_heads;
         SaveModel(model_fname, compress, softlink_created);
@@ -615,7 +615,7 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
   for (unsigned sii = 0; sii < corpus_size; ++sii) {
     const vector<unsigned>& sentence = corpus.sentences[sii];
     const vector<unsigned>& sentence_pos = corpus.sentences_pos[sii];
-    const vector<std::string>& sentence_unk_str =
+    const vector<string>& sentence_unk_str =
         corpus.sentences_unk_surface_forms[sii];
     ParseTree hyp = Parse(sentence, sentence_pos, vocab, true, &correct);
     if (output_parses) {

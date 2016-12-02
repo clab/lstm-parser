@@ -3,7 +3,7 @@ Transition based dependency parser with state embeddings computed by LSTM RNNs
 
 For the [EMNLP character-based model](http://arxiv.org/pdf/1508.00657.pdf), please check out from the branch "char-based" and follow the instructions shown in the readme file of the new branch. Here, [the branch](https://github.com/clab/lstm-parser/tree/char-based)
 
-There is an easier to use version in here [https://github.com/clab/lstm-parser/tree/easy-to-use] provided by duncanka.
+There is an easier to use version [here](https://github.com/clab/lstm-parser/tree/easy-to-use), provided by [duncanka](https://github.com/duncanka), which can be used on data without oracle transitions.
 
 #### Required software
 

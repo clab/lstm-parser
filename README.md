@@ -5,6 +5,9 @@ For the [EMNLP character-based model](http://arxiv.org/pdf/1508.00657.pdf), plea
 
 There is an easier to use version [here](https://github.com/clab/lstm-parser/tree/easy-to-use), provided by [duncanka](https://github.com/duncanka), which can be used on data without oracle transitions.
 
+There is a version [here](https://github.com/clab/lstm-parser-with-morphology) that incorporates morphological features and also allows it to run with and without character based embeddings (option -S)
+
+
 #### Required software
 
  * A C++ compiler supporting the [C++11 language standard](https://en.wikipedia.org/wiki/C%2B%2B11)

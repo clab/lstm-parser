@@ -1,5 +1,8 @@
 PROJECT(lstm-parser:parser)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-ADD_EXECUTABLE(lstm-parse lstm-parser.cc lstm-parser-driver.cc corpus.cpp)
-target_link_libraries(lstm-parse cnn ${Boost_LIBRARIES})
+ADD_LIBRARY(lstm-parser-core lstm-parser.cc corpus.cpp)
+target_link_libraries(lstm-parser-core cnn ${Boost_LIBRARIES})
+
+ADD_EXECUTABLE(lstm-parse lstm-parser-driver.cc)
+target_link_libraries(lstm-parse lstm-parser-core ${Boost_LIBRARIES})

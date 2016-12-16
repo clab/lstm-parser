@@ -1,45 +1,19 @@
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/program_options.hpp>
 #include <signal.h>
-#include <stddef.h>
 #include <unistd.h>
-#include <algorithm>
-#include <cassert>
-#include <chrono>
-#include <cmath>
 #include <cstdlib>
-#include <ctime>
-#include <iomanip>
 #include <iostream>
 #include <map>
 #include <memory>
-#include <ratio>
-#include <set>
 #include <sstream>
 #include <string>
-#include <utility>
-#include <vector>
 
-#include "../cnn/cnn/cnn.h"
-#include "../cnn/cnn/init.h"
-#include "../cnn/cnn/model.h"
-#include "../cnn/cnn/tensor.h"
-#include "../cnn/cnn/training.h"
 #include "corpus.h"
 #include "lstm-parser.h"
 
-using namespace cnn::expr;
-using namespace cnn;
 using namespace std;
 using namespace lstm_parser;
 namespace po = boost::program_options;
-namespace io = boost::iostreams;
 
 volatile bool requested_stop = false;
 
@@ -141,39 +115,26 @@ int main(int argc, char** argv) {
          << endl;
     abort();
   }
-  // If we're testing/evaluating, we have to either be loading or training a model.
+  // If we're testing/evaluating, we have to either be loading or training a
+  // model.
   if ((test || evaluate) && !load_model && !train) {
     cerr << "No model specified for testing!" << endl;
     abort();
   }
 
   const string words = load_model ? "" : conf["words"].as<string>();
-  LSTMParser parser(cmd_options, words, false);
+  unique_ptr<LSTMParser> parser;
   if (load_model) {
-    const string& model_path = conf["model"].as<string>();
-    cerr << "Loading model from " << model_path << "...";
-    if (boost::algorithm::ends_with(model_path, ".gz")) {
-      // It's a compressed stream.
-      ifstream model_stream(model_path.c_str());
-      io::filtering_streambuf<io::input> filter;
-      filter.push(io::gzip_decompressor());
-      filter.push(model_stream);
-      boost::archive::binary_iarchive archive(filter);
-      archive >> parser;
-    } else {
-      ifstream model_stream(model_path.c_str());
-      boost::archive::text_iarchive archive(model_stream);
-      archive >> parser;
-    }
-    cerr << "done." << endl;
-
-    if (parser.options != cmd_options) {
+    parser.reset(new LSTMParser(conf["model"].as<string>()));
+    if (parser->options != cmd_options) {
       // TODO: make this recognize the difference between a default option and
       // one that was actually specified on the command line, and only warn for
       // the latter.
       cerr << "WARNING: overriding command line neural network options with"
               " options saved in model" << endl;
     }
+  } else { // generate a new model; don't load from file
+    parser.reset(new LSTMParser(cmd_options, words, false));
   }
 
   unique_ptr<TrainingCorpus> dev_corpus; // shared by train/evaluate
@@ -186,31 +147,31 @@ int main(int argc, char** argv) {
     }
 
     signal(SIGINT, signal_callback_handler);
-    TrainingCorpus training_corpus(&parser.vocab,
+    TrainingCorpus training_corpus(&parser->vocab,
                                    conf["training_data"].as<string>(), true);
-    parser.FinalizeVocab();
+    parser->FinalizeVocab();
     cerr << "Total number of words: " << training_corpus.vocab->CountWords()
          << endl;
     // OOV words will be replaced by UNK tokens
-    dev_corpus.reset(new TrainingCorpus(&parser.vocab,
+    dev_corpus.reset(new TrainingCorpus(&parser->vocab,
                                         conf["dev_data"].as<string>(), false));
 
     ostringstream os;
-    os << "parser_" << (parser.options.use_pos ? "pos" : "nopos")
-       << '_' << parser.options.layers
-       << '_' << parser.options.input_dim
-       << '_' << parser.options.hidden_dim
-       << '_' << parser.options.action_dim
-       << '_' << parser.options.lstm_input_dim
-       << '_' << parser.options.pos_dim
-       << '_' << parser.options.rel_dim
+    os << "parser_" << (parser->options.use_pos ? "pos" : "nopos")
+       << '_' << parser->options.layers
+       << '_' << parser->options.input_dim
+       << '_' << parser->options.hidden_dim
+       << '_' << parser->options.action_dim
+       << '_' << parser->options.lstm_input_dim
+       << '_' << parser->options.pos_dim
+       << '_' << parser->options.rel_dim
        << "-pid" << getpid() << ".params";
     if (compress)
       os << ".gz";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    parser.Train(training_corpus, *dev_corpus, unk_prob, fname, compress,
-                 &requested_stop);
+    parser->Train(training_corpus, *dev_corpus, unk_prob, fname, compress,
+                  &requested_stop);
   }
 
   if (evaluate) {
@@ -219,14 +180,14 @@ int main(int argc, char** argv) {
       abort();
     }
 
-    parser.FinalizeVocab();
+    parser->FinalizeVocab();
     cerr << "Evaluating model on " << conf["dev_data"].as<string>() << endl;
     if (!train) { // Didn't already load dev corpus for training
       dev_corpus.reset(
-          new TrainingCorpus(&parser.vocab, conf["dev_data"].as<string>(),
+          new TrainingCorpus(&parser->vocab, conf["dev_data"].as<string>(),
                              false));
     }
-    parser.Evaluate(*dev_corpus);
+    parser->Evaluate(*dev_corpus);
   }
 
   if (test) { // actually run the parser on test data
@@ -235,7 +196,7 @@ int main(int argc, char** argv) {
       abort();
     }
 
-    parser.FinalizeVocab();
+    parser->FinalizeVocab();
     // Set up reader as pointer to make it easier to add different reader types
     // later.
     unique_ptr<CorpusReader> reader;
@@ -246,16 +207,7 @@ int main(int argc, char** argv) {
            << endl;
       abort();
     }
-    Corpus test_corpus(&parser.vocab, *reader, conf["test_data"].as<string>());
-    parser.Test(test_corpus);
+    Corpus test_corpus(&parser->vocab, *reader, conf["test_data"].as<string>());
+    parser->Test(test_corpus);
   }
-
-  /*
-  for (unsigned i = 0; i < corpus.actions.size(); ++i) {
-    cerr << corpus.actions[i] << '\t' << parser.p_r->values[i].transpose()
-         << endl;
-    cerr << corpus.actions[i] << '\t'
-         << parser.p_p2a->values.col(i).transpose() << endl;
-  }
-  //*/
 }

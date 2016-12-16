@@ -135,9 +135,10 @@ LSTMParser::LSTMParser(const ParserOptions& poptions,
   }
 
   if (finalize) {
-    FinalizeVocab();
+    FinalizeVocab(); // sets finalized
+  } else {
+    finalized = false;
   }
-  finalized = finalize;
 }
 
 

@@ -1,6 +1,14 @@
 #ifndef LSTM_PARSER_H
 #define LSTM_PARSER_H
 
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
+#include <boost/serialization/split_member.hpp>
 #include <boost/serialization/unordered_map.hpp>
 #include <fstream>
 #include <iostream>
@@ -133,6 +141,32 @@ public:
                          const std::string& pretrained_words_path,
                          bool finalize=true);
 
+  explicit LSTMParser(const std::string& model_path) :
+          kUNK(vocab.GetOrAddWord(vocab.UNK)),
+          kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
+    std::cerr << "Loading model from " << model_path << "...";
+    std::ifstream model_file(model_path.c_str());
+    if (boost::algorithm::ends_with(model_path, ".gz")) {
+      std::ifstream model_stream(model_path.c_str());
+      boost::iostreams::filtering_streambuf<boost::iostreams::input> filter;
+      filter.push(boost::iostreams::gzip_decompressor());
+      filter.push(model_stream);
+      boost::archive::binary_iarchive archive(filter);
+      archive >> *this;
+    } else {
+      boost::archive::text_iarchive archive(model_file);
+      archive >> *this;
+    }
+    std::cerr << "done." << std::endl;
+  }
+
+  template <class Archive>
+  explicit LSTMParser(Archive* archive) :
+      kUNK(vocab.GetOrAddWord(vocab.UNK)),
+      kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
+    archive >> *this;
+  }
+
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
 
@@ -204,14 +238,38 @@ protected:
 
 private:
   friend class boost::serialization::access;
+
   template<class Archive>
-  void serialize(Archive & ar, const unsigned int version) {
+  void save(Archive& ar, const unsigned int version) const {
     ar & options;
     ar & vocab;
     ar & pretrained;
-    FinalizeVocab(); // finalize *after* vocab & pretrained to make load work
     ar & model;
   }
+
+  template<class Archive>
+  void load(Archive& ar, const unsigned int version) {
+    ar & options;
+    ar & vocab;
+    // Don't finalize yet...we might get more words from pretrained vectors.
+    ar & pretrained;
+    // Don't finalize yet...we want to finalize once our model is initialized.
+
+    model = cnn::Model();
+    // Reset the LSTMs *before* reading in the network model, to make sure the
+    // model knows how big it's supposed to be.
+    stack_lstm = cnn::LSTMBuilder(options.layers, options.lstm_input_dim,
+                                  options.hidden_dim, &model);
+    buffer_lstm = cnn::LSTMBuilder(options.layers, options.lstm_input_dim,
+                                   options.hidden_dim, &model);
+    action_lstm = cnn::LSTMBuilder(options.layers, options.action_dim,
+                                   options.hidden_dim, &model);
+
+    FinalizeVocab(); // OK, now finalize. :)
+
+    ar & model;
+  }
+  BOOST_SERIALIZATION_SPLIT_MEMBER();
 
   void DoTest(const Corpus& corpus, bool evaluate, bool output_parses);
 

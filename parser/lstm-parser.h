@@ -39,6 +39,7 @@ struct ParserOptions {
   unsigned pos_dim;
   unsigned rel_dim;
   unsigned unk_strategy;
+  double unk_prob;
 
   template<class Archive>
   void serialize(Archive & ar, const unsigned int version) {
@@ -51,14 +52,17 @@ struct ParserOptions {
     ar & pos_dim;
     ar & rel_dim;
     ar & unk_strategy;
+    ar & unk_prob;
   }
 
   inline bool operator==(const ParserOptions& other) const {
+    // Lordy, I can't wait for default comparison operators.
     return use_pos == other.use_pos && layers == other.layers
         && input_dim == other.input_dim && hidden_dim == other.hidden_dim
         && action_dim == other.action_dim
         && lstm_input_dim == other.lstm_input_dim && pos_dim == other.pos_dim
-        && rel_dim == other.rel_dim && unk_strategy == other.unk_strategy;
+        && rel_dim == other.rel_dim && unk_strategy == other.unk_strategy
+        && unk_prob == other.unk_prob;
   }
 
   inline bool operator!=(const ParserOptions& other) const {

@@ -84,7 +84,6 @@ int main(int argc, char** argv) {
   InitCommandLine(argc, argv, &conf);
 
   // Training options and operation options
-  const double unk_prob = conf["unk_prob"].as<double>();
   const bool train = conf.count("train");
   const bool test = conf.count("test");
   const bool evaluate = conf.count("evaluate");
@@ -100,7 +99,8 @@ int main(int argc, char** argv) {
     conf["lstm_input_dim"].as<unsigned>(),
     conf["pos_dim"].as<unsigned>(),
     conf["rel_dim"].as<unsigned>(),
-    conf["unk_strategy"].as<unsigned>()
+    conf["unk_strategy"].as<unsigned>(),
+    conf["unk_prob"].as<double>()
   };
 
   cerr << "Unknown word strategy: ";
@@ -110,9 +110,9 @@ int main(int argc, char** argv) {
     cerr << "INVALID SELECTION" << endl;
     abort();
   }
-  if (unk_prob < 0. || unk_prob > 1.) {
-    cerr << "Invalid unknown word substitution probability: " << unk_prob
-         << endl;
+  if (cmd_options.unk_prob < 0. || cmd_options.unk_prob > 1.) {
+    cerr << "Invalid unknown word substitution probability: "
+         << cmd_options.unk_prob << endl;
     abort();
   }
   // If we're testing/evaluating, we have to either be loading or training a

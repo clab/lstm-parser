@@ -575,7 +575,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     double* correct) {
   vector<unsigned> tsentence(sentence); // sentence with OOVs replaced
   for (unsigned& word_id : tsentence) { // use reference to overwrite
-    if (vocab.int_to_training_word[word_id]) {
+    if (!vocab.int_to_training_word[word_id]) {
       word_id = kUNK;
     }
   }

@@ -168,7 +168,7 @@ public:
   explicit LSTMParser(Archive* archive) :
       kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
-    archive >> *this;
+    *archive >> *this;
   }
 
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
@@ -253,6 +253,8 @@ private:
 
   template<class Archive>
   void load(Archive& ar, const unsigned int version) {
+    finalized = false; // we'll need to re-finalize after resetting the network.
+
     ar & options;
     ar & vocab;
     // Don't finalize yet...we might get more words from pretrained vectors.

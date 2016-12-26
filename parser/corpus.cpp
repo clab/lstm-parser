@@ -16,7 +16,8 @@ constexpr unsigned Corpus::ROOT_TOKEN_ID;
 
 const string CorpusVocabulary::BAD0 = "<BAD0>";
 const string CorpusVocabulary::UNK = "<UNK>";
-const string CorpusVocabulary::ROOT = "ROOT";
+const string CorpusVocabulary::ROOT = "<ROOT>";
+const string ORACLE_ROOT_POS = "ROOT";
 
 
 void ConllUCorpusReader::ReadSentences(const string& file,
@@ -161,7 +162,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
       first = false;
       //stack and buffer, for now, leave it like this.
       if (start_of_sentence) {
-        // the initial line in each sentence may look like:
+        // the initial line in each sentence should look like:
         // [][the-det, cat-noun, is-verb, on-adp, the-det, mat-noun, ,-punct, ROOT-ROOT]
         // first, get rid of the square brackets.
         lineS = lineS.substr(3, lineS.size() - 4);
@@ -186,6 +187,12 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
           assert(posIndex != string::npos);
           string pos = word.substr(posIndex + 1);
           word = word.substr(0, posIndex);
+
+          if (pos == ORACLE_ROOT_POS) {
+            // Prevent any confusion with the actual word "ROOT".
+            word = CorpusVocabulary::ROOT;
+            pos = CorpusVocabulary::ROOT;
+          }
 
           // We assume that we'll have seen all POS tags in training, so don't
           // worry about OOV tags.

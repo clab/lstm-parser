@@ -7,11 +7,14 @@
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_streambuf.hpp>
+#include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
 #include <map>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -81,7 +84,7 @@ void LSTMParser::FinalizeVocab() {
   if (!pretrained.empty()) {
     unsigned pretrained_dim = pretrained.begin()->second.size();
     p_t = model.add_lookup_parameters(vocab_size, {pretrained_dim});
-    for (auto it : pretrained)
+    for (const auto& it : pretrained)
       p_t->Initialize(it.first, it.second);
     p_t2l = model.add_parameters({options.lstm_input_dim, pretrained_dim});
   } else {

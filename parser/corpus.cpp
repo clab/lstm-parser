@@ -4,7 +4,6 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <sstream>
 #include <string>
 
@@ -50,8 +49,7 @@ void ConllUCorpusReader::ReadSentences(const string& file,
         current_sentence_unk_surface_forms.clear();
       }
       continue;
-    }
-    else if (next_line[0] == '#') {
+    } else if (next_line[0] == '#') {
       // TODO: carry over comment lines, as required by CoNLL-U format spec?
       continue;
     }

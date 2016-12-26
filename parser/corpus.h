@@ -188,6 +188,10 @@ public:
 
 class Corpus {
 public:
+  // Store root tokens with unsigned ID -1 internally to make root come last
+  // when iterating over a list of tokens in order of IDs.
+  static constexpr unsigned ROOT_TOKEN_ID = -1;
+
   std::vector<std::map<unsigned, unsigned>> sentences;
   std::vector<std::map<unsigned, unsigned>> sentences_pos;
   std::vector<std::map<unsigned, std::string>> sentences_unk_surface_forms;

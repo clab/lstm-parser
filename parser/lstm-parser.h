@@ -82,24 +82,26 @@ public:
       arc_labels( labeled ? new std::map<unsigned, std::string> : nullptr) {
   }
 
-  inline void SetParent(unsigned index, unsigned parent_index,
+  inline void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {
-    parents[index] = parent_index;
+    parents[child_index] = parent_index;
     if (arc_labels) {
-      (*arc_labels)[index] = arc_label;
+      (*arc_labels)[child_index] = arc_label;
     }
   }
 
-  const inline int GetParent(unsigned child) const {
+  const inline unsigned GetParent(unsigned child) const {
     auto parent_iter = parents.find(child);
     if (parent_iter == parents.end()) {
-      return -1;
+      return Corpus::ROOT_TOKEN_ID; // This is the best guess we've got.
     } else {
       return parent_iter->second;
     }
   }
 
   const inline std::string& GetArcLabel(unsigned child) const {
+    if (!arc_labels)
+      return NO_LABEL;
     auto arc_label_iter = arc_labels->find(child);
     if (arc_label_iter == arc_labels->end()) {
       return NO_LABEL;
@@ -109,7 +111,7 @@ public:
   }
 
 private:
-  std::map<int, int> parents;
+  std::map<unsigned, unsigned> parents;
   std::unique_ptr<std::map<unsigned, std::string>> arc_labels;
 };
 
@@ -191,7 +193,7 @@ public:
                   const CorpusVocabulary& vocab, bool labeled, double* correct);
 
   // take a vector of actions and return a parse tree
-  static ParseTree RecoverParseTree(
+  ParseTree RecoverParseTree(
       const std::map<unsigned, unsigned>& sentence,
       const std::vector<unsigned>& actions,
       const std::vector<std::string>& action_names,
@@ -245,9 +247,9 @@ protected:
                                  const ParseTree& hyp) const {
     assert(ref.sentence.size() == hyp.sentence.size());
     unsigned correct_count = 0;
-    // Ignore last element of sentence, which is always ROOT.
-    for (unsigned i = 0; i < ref.sentence.size() - 1; ++i) {
-      if (ref.GetParent(i) == hyp.GetParent(i))
+    for (const auto& token_index_and_word : ref.sentence) {
+      unsigned i = token_index_and_word.first;
+      if (i != Corpus::ROOT_TOKEN_ID && ref.GetParent(i) == hyp.GetParent(i))
         ++correct_count;
     }
     return correct_count;

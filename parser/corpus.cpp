@@ -12,6 +12,8 @@ using namespace std;
 
 namespace lstm_parser {
 
+constexpr unsigned Corpus::ROOT_TOKEN_ID;
+
 const string CorpusVocabulary::BAD0 = "<BAD0>";
 const string CorpusVocabulary::UNK = "<UNK>";
 const string CorpusVocabulary::ROOT = "ROOT";
@@ -32,9 +34,9 @@ void ConllUCorpusReader::ReadSentences(const string& file,
     getline(conll_file, next_line);
     if (next_line.empty()) {
       if (!current_sentence.empty()) { // just in case we get 2 blank lines
-        current_sentence[0] = root_symbol;
-        current_sentence_pos[0] = root_pos_symbol;
-        current_sentence_unk_surface_forms[0] = "";
+        current_sentence[Corpus::ROOT_TOKEN_ID] = root_symbol;
+        current_sentence_pos[Corpus::ROOT_TOKEN_ID] = root_pos_symbol;
+        current_sentence_unk_surface_forms[Corpus::ROOT_TOKEN_ID] = "";
 
         corpus->sentences.push_back(move(current_sentence));
         current_sentence.clear();
@@ -106,25 +108,49 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
   bool start_of_sentence = false;
   bool first = true;
 
-  map<unsigned, unsigned> current_sent;
-  map<unsigned, unsigned> current_sent_pos;
-  map<unsigned, string> current_sent_unk_surface_strs;
+  map<unsigned, unsigned> sentence;
+  map<unsigned, unsigned> sentence_pos;
+  map<unsigned, string> sentence_unk_surface_forms;
+
+  // We'll need to make sure ROOT token has a consistent ID.
+  // (Should get inlined; defined here for DRY purposes.)
+  auto FixRootID =
+      [&sentence, &sentence_pos, &sentence_unk_surface_forms]() {
+    // ROOT is always added as the last token in the sentence. Since IDs are
+    // 1-indexed, the last element in an n-word sentence will have an ID of n.
+    unsigned original_root_id = sentence.size();
+    auto root_iter = sentence.find(original_root_id);
+    sentence[Corpus::ROOT_TOKEN_ID] = root_iter->second;
+    sentence.erase(root_iter);
+
+    auto root_pos_iter = sentence_pos.find(original_root_id);
+    sentence_pos[Corpus::ROOT_TOKEN_ID] = root_pos_iter->second;
+    sentence_pos.erase(root_pos_iter);
+
+    if (!sentence_unk_surface_forms.empty()) {
+      auto root_str_iter = sentence_unk_surface_forms.find(original_root_id);
+      sentence_unk_surface_forms[Corpus::ROOT_TOKEN_ID] = "";
+      sentence_unk_surface_forms.erase(root_str_iter);
+    }
+  };
+
   while (getline(actionsFile, lineS)) {
     ReplaceStringInPlace(lineS, "-RRB-", "_RRB_");
     ReplaceStringInPlace(lineS, "-LRB-", "_LRB_");
     // An empty line marks the end of a sentence.
     if (lineS.empty()) {
       next_is_action_line = false;
-      if (!first) { // first line is blank, but no sentence yet
+      if (!first) { // if first, first line is blank, but no sentence yet
+        FixRootID();
         // Store the sentence variables and clear them for the next sentence.
         corpus->sentences.push_back({});
-        corpus->sentences.back().swap(current_sent);
+        corpus->sentences.back().swap(sentence);
         corpus->sentences_pos.push_back({});
-        corpus->sentences_pos.back().swap(current_sent_pos);
+        corpus->sentences_pos.back().swap(sentence_pos);
         if (!is_training) {
           corpus->sentences_unk_surface_forms.push_back({});
           corpus->sentences_unk_surface_forms.back().swap(
-              current_sent_unk_surface_strs);
+              sentence_unk_surface_forms);
         }
       }
       start_of_sentence = true;
@@ -165,7 +191,8 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
           // worry about OOV tags.
           unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
                                                  &vocab->int_to_pos);
-          unsigned next_token_index = current_sent.size();
+          // Use 1-indexed token IDs to leave room for ROOT in position 0.
+          unsigned next_token_index = sentence.size() + 1;
           unsigned word_id;
           if (is_training) {
             unsigned num_words = vocab->CountWords(); // store for later check
@@ -190,22 +217,22 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
             // OOV word
             if (corpus->USE_SPELLING) {
               word_id = vocab->GetOrAddWord(word); // don't record as training
-              current_sent_unk_surface_strs[next_token_index] = "";
+              sentence_unk_surface_forms[next_token_index] = "";
             } else {
               auto word_iter = vocab->words_to_int.find(word);
               if (word_iter == vocab->words_to_int.end()) {
                 // Save the surface form of this OOV.
-                current_sent_unk_surface_strs[next_token_index] = word;
+                sentence_unk_surface_forms[next_token_index] = word;
                 word_id = vocab->words_to_int[vocab->UNK];
               } else {
-                current_sent_unk_surface_strs[next_token_index] = "";
+                sentence_unk_surface_forms[next_token_index] = "";
                 word_id = word_iter->second;
               }
             }
           }
 
-          current_sent[next_token_index] = word_id;
-          current_sent_pos[next_token_index] = pos_id;
+          sentence[next_token_index] = word_id;
+          sentence_pos[next_token_index] = pos_id;
         } while (iss);
       }
     } else if (next_is_action_line) {
@@ -245,12 +272,13 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
   }
 
   // Add the last sentence.
-  if (current_sent.size() > 0) {
-    corpus->sentences.push_back(move(current_sent));
-    corpus->sentences_pos.push_back(move(current_sent_pos));
+  if (sentence.size() > 0) {
+    FixRootID();
+    corpus->sentences.push_back(move(sentence));
+    corpus->sentences_pos.push_back(move(sentence_pos));
     if (!is_training) {
       corpus->sentences_unk_surface_forms.push_back(
-          move(current_sent_unk_surface_strs));
+          move(sentence_unk_surface_forms));
     }
   }
 

@@ -178,11 +178,14 @@ ParseTree LSTMParser::RecoverParseTree(
     const vector<string>& action_names,
     const vector<string>& actions_to_arc_labels, bool labeled) {
   ParseTree tree(sentence, labeled);
-  vector<int> bufferi(sentence.size() + 1, 0);
-  vector<int> stacki(1, -999);
-  for (unsigned i = 0; i < sentence.size(); ++i)
-    bufferi[sentence.size() - i] = i;
+  vector<int> bufferi(sentence.size() + 1);
   bufferi[0] = -999;
+  vector<int> stacki(1, -999);
+  unsigned added_to_buffer = 0;
+  for (const auto& index_and_word_id : sentence) {
+    // ROOT is set to -1, so it'll come last in a sequence of unsigned ints.
+    bufferi[sentence.size() - added_to_buffer++] = index_and_word_id.first;
+  }
   for (auto action : actions) { // loop over transitions for sentence
     const string& action_string = action_names[action];
     const char ac = action_string[0];
@@ -193,7 +196,8 @@ ParseTree LSTMParser::RecoverParseTree(
       bufferi.pop_back();
     } else if (ac == 'S' && ac2 == 'W') { // SWAP
       assert(stacki.size() > 2);
-      unsigned ii = 0, jj = 0;
+      unsigned ii;
+      unsigned jj;
       jj = stacki.back();
       stacki.pop_back();
       ii = stacki.back();
@@ -203,7 +207,8 @@ ParseTree LSTMParser::RecoverParseTree(
     } else { // LEFT or RIGHT
       assert(stacki.size() > 2); // dummy symbol means > 2 (not >= 2)
       assert(ac == 'L' || ac == 'R');
-      unsigned depi = 0, headi = 0;
+      unsigned depi;
+      unsigned headi;
       (ac == 'R' ? depi : headi) = stacki.back();
       stacki.pop_back();
       (ac == 'R' ? headi : depi) = stacki.back();
@@ -302,7 +307,6 @@ vector<unsigned> LSTMParser::LogProbParser(
   // drive dummy symbol on stack through LSTM
   stack_lstm.add_input(stack.back());
   vector<Expression> log_probs;
-  string rootword;
   unsigned action_count = 0;  // incremented at each prediction
   while (stack.size() > 2 || buffer.size() > 1) {
     // get list of possible actions for the current parser state
@@ -405,8 +409,6 @@ vector<unsigned> LSTMParser::LogProbParser(
       (ac == 'R' ? headi : depi) = stacki.back();
       stack.pop_back();
       stacki.pop_back();
-      if (headi == sent.size() - 1)
-        rootword = int_to_words[sent.find(depi)->second];
       // composed = cbias + H * head + D * dep + R * relation
       Expression composed = affine_transform({cbias, H, head, D, dep, R,
                                               relation});
@@ -554,17 +556,18 @@ void LSTMParser::Train(const TrainingCorpus& corpus,
         const map<unsigned, unsigned>& sentence = dev_corpus.sentences[sii];
         const map<unsigned, unsigned>& sentence_pos =
             dev_corpus.sentences_pos[sii];
-        const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
         ParseTree hyp = Parse(sentence, sentence_pos, vocab, false, &correct);
 
         double lp = 0;
         llh -= lp;
-        trs += actions.size();
+        const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
         ParseTree ref = RecoverParseTree(
             sentence, actions, dev_corpus.vocab->actions,
             dev_corpus.vocab->actions_to_arc_labels);
+
+        trs += actions.size();
         correct_heads += ComputeCorrect(ref, hyp);
-        total_heads += sentence.size() - 1;
+        total_heads += sentence.size() - 1; // -1 to account for ROOT
       }
       auto t_end = chrono::high_resolution_clock::now();
       cerr << "  **dev (iter=" << iter << " epoch="
@@ -648,7 +651,7 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
                                        true);
       trs += actions.size();
       correct_heads += ComputeCorrect(ref, hyp);
-      total_heads += sentence.size() - 1;
+      total_heads += sentence.size() - 1; // -1 to account for ROOT
     }
   }
   auto t_end = chrono::high_resolution_clock::now();
@@ -678,6 +681,9 @@ void LSTMParser::OutputConll(const map<unsigned, unsigned>& sentence,
   for (const auto& token_index_and_word : sentence) {
     unsigned token_index = token_index_and_word.first;
     unsigned word_id = token_index_and_word.second;
+    if (token_index == Corpus::ROOT_TOKEN_ID) // don't output anything for ROOT
+      continue;
+
     auto unk_strs_iter = sentence_unk_strings.find(token_index);
     assert(unk_strs_iter != sentence_unk_strings.end() &&
            ((word_id == unk_word && unk_strs_iter->second.size() > 0) ||
@@ -686,8 +692,8 @@ void LSTMParser::OutputConll(const map<unsigned, unsigned>& sentence,
     string wit = (unk_strs_iter->second.size() > 0) ?
                   unk_strs_iter->second : int_to_words[word_id];
     const string& pos_tag = int_to_pos[pos.find(token_index)->second];
-    int parent = tree.GetParent(token_index) + 1;
-    if (parent == (int) sentence.size())
+    unsigned parent = tree.GetParent(token_index);
+    if (parent == Corpus::ROOT_TOKEN_ID)
       parent = 0;
     const string& deprel = tree.GetArcLabel(token_index);
     cout << token_index << '\t' //  1. ID

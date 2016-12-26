@@ -4,7 +4,6 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <sstream>
 #include <string>
 
@@ -12,29 +11,32 @@ using namespace std;
 
 namespace lstm_parser {
 
-const string CorpusVocabulary::UNK = "<UNK>";
+constexpr unsigned Corpus::ROOT_TOKEN_ID;
+
 const string CorpusVocabulary::BAD0 = "<BAD0>";
-const string CorpusVocabulary::ROOT = "ROOT";
+const string CorpusVocabulary::UNK = "<UNK>";
+const string CorpusVocabulary::ROOT = "<ROOT>";
+const string ORACLE_ROOT_POS = "ROOT";
 
 
 void ConllUCorpusReader::ReadSentences(const string& file,
                                        Corpus* corpus) const {
   string next_line;
-  vector<string> current_sentence_unk_surface_forms;
-  vector<unsigned> current_sentence;
-  vector<unsigned> current_sentence_pos;
+  map<unsigned, string> current_sentence_unk_surface_forms;
+  map<unsigned, unsigned> current_sentence;
+  map<unsigned, unsigned> current_sentence_pos;
 
   ifstream conll_file(file);
-  unsigned unk_word = corpus->vocab->GetWord(CorpusVocabulary::UNK);
+  unsigned unk_word_symbol = corpus->vocab->GetWord(CorpusVocabulary::UNK);
   unsigned root_symbol = corpus->vocab->GetWord(CorpusVocabulary::ROOT);
   unsigned root_pos_symbol = corpus->vocab->GetPOS(CorpusVocabulary::ROOT);
   while(conll_file) {
     getline(conll_file, next_line);
     if (next_line.empty()) {
       if (!current_sentence.empty()) { // just in case we get 2 blank lines
-        current_sentence.push_back(root_symbol);
-        current_sentence_pos.push_back(root_pos_symbol);
-        current_sentence_unk_surface_forms.push_back("");
+        current_sentence[Corpus::ROOT_TOKEN_ID] = root_symbol;
+        current_sentence_pos[Corpus::ROOT_TOKEN_ID] = root_pos_symbol;
+        current_sentence_unk_surface_forms[Corpus::ROOT_TOKEN_ID] = "";
 
         corpus->sentences.push_back(move(current_sentence));
         current_sentence.clear();
@@ -47,43 +49,42 @@ void ConllUCorpusReader::ReadSentences(const string& file,
         current_sentence_unk_surface_forms.clear();
       }
       continue;
-    }
-    else if (next_line[0] == '#') {
+    } else if (next_line[0] == '#') {
       // TODO: carry over comment lines, as required by CoNLL-U format spec?
       continue;
     }
 
     istringstream line_stream(next_line);
-    unsigned token_id;
+    unsigned token_index;
     string surface_form;
     string pos;
     string dummy;
-    line_stream >> token_id;
-    if (token_id < current_sentence.size() + 1) {
+    line_stream >> token_index;
+    if (token_index < current_sentence.size() + 1) {
       throw ConllFormatException(
           "Format error in file " + file + ": expected token ID at least "
           + to_string(current_sentence.size() + 1) + "; got "
-          + to_string(token_id));
+          + to_string(token_index));
     }
-    // TODO: Preserve token IDs somehow? (Sometimes some are skipped for punct.)
     line_stream >> surface_form >> dummy >> dummy // skip lemma and xposttag
-                >> pos; // skip the rest of the line
+                >> pos; // ignore the rest of the line
 
     unsigned word_id = corpus->vocab->GetWord(surface_form);
-    current_sentence_unk_surface_forms.push_back(
-        word_id == unk_word ? surface_form : "");
-    current_sentence.push_back(word_id);
-    current_sentence_pos.push_back(corpus->vocab->GetPOS(pos));
+    current_sentence_unk_surface_forms[token_index] =
+        (word_id == unk_word_symbol ? surface_form : "");
+    current_sentence[token_index] = word_id;
+    current_sentence_pos[token_index] = corpus->vocab->GetPOS(pos);
   }
 }
+
 
 
 void TrainingCorpus::CountSingletons() {
   // compute the singletons in the parser's training data
   map<unsigned, unsigned> counts;
   for (const auto& sent : sentences) {
-    for (const unsigned word : sent) {
-      counts[word]++;
+    for (const auto& index_and_word_id : sent) {
+      counts[index_and_word_id.second]++;
     }
   }
   for (const auto wc : counts) {
@@ -106,25 +107,49 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
   bool start_of_sentence = false;
   bool first = true;
 
-  vector<unsigned> current_sent;
-  vector<unsigned> current_sent_pos;
-  vector<string> current_sent_unk_surface_strs;
+  map<unsigned, unsigned> sentence;
+  map<unsigned, unsigned> sentence_pos;
+  map<unsigned, string> sentence_unk_surface_forms;
+
+  // We'll need to make sure ROOT token has a consistent ID.
+  // (Should get inlined; defined here for DRY purposes.)
+  auto FixRootID =
+      [&sentence, &sentence_pos, &sentence_unk_surface_forms]() {
+    // ROOT is always added as the last token in the sentence. Since IDs are
+    // 1-indexed, the last element in an n-word sentence will have an ID of n.
+    unsigned original_root_id = sentence.size();
+    auto root_iter = sentence.find(original_root_id);
+    sentence[Corpus::ROOT_TOKEN_ID] = root_iter->second;
+    sentence.erase(root_iter);
+
+    auto root_pos_iter = sentence_pos.find(original_root_id);
+    sentence_pos[Corpus::ROOT_TOKEN_ID] = root_pos_iter->second;
+    sentence_pos.erase(root_pos_iter);
+
+    if (!sentence_unk_surface_forms.empty()) {
+      auto root_str_iter = sentence_unk_surface_forms.find(original_root_id);
+      sentence_unk_surface_forms[Corpus::ROOT_TOKEN_ID] = "";
+      sentence_unk_surface_forms.erase(root_str_iter);
+    }
+  };
+
   while (getline(actionsFile, lineS)) {
     ReplaceStringInPlace(lineS, "-RRB-", "_RRB_");
     ReplaceStringInPlace(lineS, "-LRB-", "_LRB_");
     // An empty line marks the end of a sentence.
     if (lineS.empty()) {
       next_is_action_line = false;
-      if (!first) { // first line is blank, but no sentence yet
+      if (!first) { // if first, first line is blank, but no sentence yet
+        FixRootID();
         // Store the sentence variables and clear them for the next sentence.
         corpus->sentences.push_back({});
-        corpus->sentences.back().swap(current_sent);
+        corpus->sentences.back().swap(sentence);
         corpus->sentences_pos.push_back({});
-        corpus->sentences_pos.back().swap(current_sent_pos);
+        corpus->sentences_pos.back().swap(sentence_pos);
         if (!is_training) {
           corpus->sentences_unk_surface_forms.push_back({});
           corpus->sentences_unk_surface_forms.back().swap(
-              current_sent_unk_surface_strs);
+              sentence_unk_surface_forms);
         }
       }
       start_of_sentence = true;
@@ -135,7 +160,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
       first = false;
       //stack and buffer, for now, leave it like this.
       if (start_of_sentence) {
-        // the initial line in each sentence may look like:
+        // the initial line in each sentence should look like:
         // [][the-det, cat-noun, is-verb, on-adp, the-det, mat-noun, ,-punct, ROOT-ROOT]
         // first, get rid of the square brackets.
         lineS = lineS.substr(3, lineS.size() - 4);
@@ -161,10 +186,18 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
           string pos = word.substr(posIndex + 1);
           word = word.substr(0, posIndex);
 
+          if (pos == ORACLE_ROOT_POS) {
+            // Prevent any confusion with the actual word "ROOT".
+            word = CorpusVocabulary::ROOT;
+            pos = CorpusVocabulary::ROOT;
+          }
+
           // We assume that we'll have seen all POS tags in training, so don't
           // worry about OOV tags.
           unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
                                                  &vocab->int_to_pos);
+          // Use 1-indexed token IDs to leave room for ROOT in position 0.
+          unsigned next_token_index = sentence.size() + 1;
           unsigned word_id;
           if (is_training) {
             unsigned num_words = vocab->CountWords(); // store for later check
@@ -189,22 +222,22 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
             // OOV word
             if (corpus->USE_SPELLING) {
               word_id = vocab->GetOrAddWord(word); // don't record as training
-              current_sent_unk_surface_strs.push_back("");
+              sentence_unk_surface_forms[next_token_index] = "";
             } else {
               auto word_iter = vocab->words_to_int.find(word);
               if (word_iter == vocab->words_to_int.end()) {
                 // Save the surface form of this OOV.
-                current_sent_unk_surface_strs.push_back(word);
+                sentence_unk_surface_forms[next_token_index] = word;
                 word_id = vocab->words_to_int[vocab->UNK];
               } else {
-                current_sent_unk_surface_strs.push_back("");
+                sentence_unk_surface_forms[next_token_index] = "";
                 word_id = word_iter->second;
               }
             }
           }
 
-          current_sent.push_back(word_id);
-          current_sent_pos.push_back(pos_id);
+          sentence[next_token_index] = word_id;
+          sentence_pos[next_token_index] = pos_id;
         } while (iss);
       }
     } else if (next_is_action_line) {
@@ -244,12 +277,13 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
   }
 
   // Add the last sentence.
-  if (current_sent.size() > 0) {
-    corpus->sentences.push_back(move(current_sent));
-    corpus->sentences_pos.push_back(move(current_sent_pos));
+  if (sentence.size() > 0) {
+    FixRootID();
+    corpus->sentences.push_back(move(sentence));
+    corpus->sentences_pos.push_back(move(sentence_pos));
     if (!is_training) {
       corpus->sentences_unk_surface_forms.push_back(
-          move(current_sent_unk_surface_strs));
+          move(sentence_unk_surface_forms));
     }
   }
 
@@ -265,7 +299,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
   cerr << "# of words: " << vocab->CountWords() << "\n";
   if (is_training) {
     for (unsigned i = 0; i < vocab->int_to_pos.size(); i++) {
-      cerr << i << ":" << vocab->int_to_pos[i] << "\n";
+      cerr << i << ": " << vocab->int_to_pos[i] << "\n";
     }
   } else {
     cerr << "# of POS tags: " << vocab->CountPOS() << "\n";

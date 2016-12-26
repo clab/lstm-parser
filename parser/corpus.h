@@ -20,8 +20,8 @@ public:
   typedef std::map<std::string, unsigned> StrToIntMap;
 
   // String literals
-  static const std::string UNK;
   static const std::string BAD0;
+  static const std::string UNK;
   static const std::string ROOT;
 
   StrToIntMap words_to_int;
@@ -188,9 +188,13 @@ public:
 
 class Corpus {
 public:
-  std::vector<std::vector<unsigned>> sentences;
-  std::vector<std::vector<unsigned>> sentences_pos;
-  std::vector<std::vector<std::string>> sentences_unk_surface_forms;
+  // Store root tokens with unsigned ID -1 internally to make root come last
+  // when iterating over a list of tokens in order of IDs.
+  static constexpr unsigned ROOT_TOKEN_ID = -1;
+
+  std::vector<std::map<unsigned, unsigned>> sentences;
+  std::vector<std::map<unsigned, unsigned>> sentences_pos;
+  std::vector<std::map<unsigned, std::string>> sentences_unk_surface_forms;
   CorpusVocabulary* vocab;
 
   Corpus(CorpusVocabulary* vocab, const CorpusReader& reader,

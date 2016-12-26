@@ -170,8 +170,8 @@ int main(int argc, char** argv) {
       os << ".gz";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
-    parser->Train(training_corpus, *dev_corpus, unk_prob, fname, compress,
-                  &requested_stop);
+    parser->Train(training_corpus, *dev_corpus, parser->options.unk_prob, fname,
+                  compress, &requested_stop);
   }
 
   if (evaluate) {

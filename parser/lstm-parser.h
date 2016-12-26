@@ -73,32 +73,46 @@ struct ParserOptions {
 
 class ParseTree {
 public:
+  static std::string NO_LABEL;
   // Barebones representation of a parse tree.
-  const std::vector<unsigned>& sentence;
+  const std::map<unsigned, unsigned>& sentence;
 
-  ParseTree(const std::vector<unsigned>& sentence, bool labeled = true) :
+  ParseTree(const std::map<unsigned, unsigned>& sentence, bool labeled = true) :
       sentence(sentence),
-      parents(sentence.size(), -1),
-      arc_labels( labeled ? new std::vector<std::string>(sentence.size(),
-                                                         "ERROR") : nullptr) {
+      arc_labels( labeled ? new std::map<unsigned, std::string> : nullptr) {
   }
 
-  inline void SetParent(unsigned index, unsigned parent_index,
+  inline void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {
-    parents[index] = parent_index;
+    parents[child_index] = parent_index;
     if (arc_labels) {
-      (*arc_labels)[index] = arc_label;
+      (*arc_labels)[child_index] = arc_label;
     }
   }
 
-  const inline std::vector<int>& GetParents() const { return parents; }
-  const inline std::vector<std::string>& GetArcLabels() const {
-    return *arc_labels;
+  const inline unsigned GetParent(unsigned child) const {
+    auto parent_iter = parents.find(child);
+    if (parent_iter == parents.end()) {
+      return Corpus::ROOT_TOKEN_ID; // This is the best guess we've got.
+    } else {
+      return parent_iter->second;
+    }
+  }
+
+  const inline std::string& GetArcLabel(unsigned child) const {
+    if (!arc_labels)
+      return NO_LABEL;
+    auto arc_label_iter = arc_labels->find(child);
+    if (arc_label_iter == arc_labels->end()) {
+      return NO_LABEL;
+    } else {
+      return arc_label_iter->second;
+    }
   }
 
 private:
-  std::vector<int> parents;
-  std::unique_ptr<std::vector<std::string>> arc_labels;
+  std::map<unsigned, unsigned> parents;
+  std::unique_ptr<std::map<unsigned, std::string>> arc_labels;
 };
 
 
@@ -168,19 +182,19 @@ public:
   explicit LSTMParser(Archive* archive) :
       kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
-    archive >> *this;
+    *archive >> *this;
   }
 
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
 
-  ParseTree Parse(const std::vector<unsigned>& sentence,
-                  const std::vector<unsigned>& sentence_pos,
+  ParseTree Parse(const std::map<unsigned, unsigned>& sentence,
+                  const std::map<unsigned, unsigned>& sentence_pos,
                   const CorpusVocabulary& vocab, bool labeled, double* correct);
 
   // take a vector of actions and return a parse tree
-  static ParseTree RecoverParseTree(
-      const std::vector<unsigned>& sentence,
+  ParseTree RecoverParseTree(
+      const std::map<unsigned, unsigned>& sentence,
       const std::vector<unsigned>& actions,
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& actions_to_arc_labels,
@@ -200,9 +214,10 @@ public:
 
   // Used for testing. Replaces OOV with UNK.
   std::vector<unsigned> LogProbParser(
-      const std::vector<unsigned>& sentence,
-      const std::vector<unsigned>& sentence_pos, const CorpusVocabulary& vocab,
-      cnn::ComputationGraph *cg, double* correct);
+      const std::map<unsigned, unsigned>& sentence,
+      const std::map<unsigned, unsigned>& sentence_pos,
+      const CorpusVocabulary& vocab, cnn::ComputationGraph *cg,
+      double* correct);
 
   void LoadPretrainedWords(const std::string& words_path);
 
@@ -218,9 +233,9 @@ protected:
   // OOV in the parser training data.
   std::vector<unsigned> LogProbParser(
       cnn::ComputationGraph* hg,
-      const std::vector<unsigned>& raw_sent,  // raw sentence
-      const std::vector<unsigned>& sent,  // sentence with OOVs replaced
-      const std::vector<unsigned>& sentPos,
+      const std::map<unsigned, unsigned>& raw_sent,  // raw sentence
+      const std::map<unsigned, unsigned>& sent,  // sentence with OOVs replaced
+      const std::map<unsigned, unsigned>& sentPos,
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& int_to_words, double* right);
@@ -232,9 +247,9 @@ protected:
                                  const ParseTree& hyp) const {
     assert(ref.sentence.size() == hyp.sentence.size());
     unsigned correct_count = 0;
-    // Ignore last element of sentence, which is always ROOT.
-    for (unsigned i = 0; i < ref.sentence.size() - 1; ++i) {
-      if (ref.GetParents()[i] == hyp.GetParents()[i])
+    for (const auto& token_index_and_word : ref.sentence) {
+      unsigned i = token_index_and_word.first;
+      if (i != Corpus::ROOT_TOKEN_ID && ref.GetParent(i) == hyp.GetParent(i))
         ++correct_count;
     }
     return correct_count;
@@ -253,6 +268,8 @@ private:
 
   template<class Archive>
   void load(Archive& ar, const unsigned int version) {
+    finalized = false; // we'll need to re-finalize after resetting the network.
+
     ar & options;
     ar & vocab;
     // Don't finalize yet...we might get more words from pretrained vectors.
@@ -277,13 +294,13 @@ private:
 
   void DoTest(const Corpus& corpus, bool evaluate, bool output_parses);
 
-  static void OutputConll(const std::vector<unsigned>& sentence,
-                          const std::vector<unsigned>& pos,
-                          const std::vector<std::string>& sentence_unk_strings,
-                          const std::vector<std::string>& int_to_words,
-                          const std::vector<std::string>& int_to_pos,
-                          const std::map<std::string, unsigned>& words_to_int,
-                          const ParseTree& tree);
+  static void OutputConll(const std::map<unsigned, unsigned>& sentence,
+      const std::map<unsigned, unsigned>& pos,
+      const std::map<unsigned, std::string>& sentence_unk_strings,
+      const std::vector<std::string>& int_to_words,
+      const std::vector<std::string>& int_to_pos,
+      const std::map<std::string, unsigned>& words_to_int,
+      const ParseTree& tree);
 };
 
 } // namespace lstm_parser

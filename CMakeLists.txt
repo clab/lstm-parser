@@ -8,7 +8,7 @@ enable_testing()
 
 #include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cnn)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/eos)
 set(WITH_EIGEN_BACKEND 1)
 
 # look for Boost

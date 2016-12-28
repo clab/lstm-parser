@@ -1,18 +1,12 @@
 #include "lstm-parser.h"
 
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/filtering_streambuf.hpp>
 #include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
+#include <iomanip>
 #include <map>
 #include <string>
 #include <utility>
@@ -20,11 +14,12 @@
 
 #include "cnn/model.h"
 #include "cnn/tensor.h"
+#include "eos/portable_archive.hpp"
+
 
 using namespace cnn::expr;
 using namespace cnn;
 using namespace std;
-namespace io = boost::iostreams;
 
 namespace lstm_parser {
 
@@ -433,26 +428,15 @@ vector<unsigned> LSTMParser::LogProbParser(
 }
 
 
-void LSTMParser::SaveModel(const string& model_fname, bool compress,
-                           bool softlink_created) {
+void LSTMParser::SaveModel(const string& model_fname, bool softlink_created) {
   ofstream out_file(model_fname);
-  if (compress) {
-    io::filtering_streambuf<io::output> filter;
-    filter.push(io::gzip_compressor());
-    filter.push(out_file);
-    boost::archive::binary_oarchive oa(filter);
-    oa << *this;
-  } else {
-    boost::archive::text_oarchive oa(out_file);
-    oa << *this;
-  }
+  eos::portable_oarchive archive(out_file);
+  archive << *this;
   cerr << "Model saved." << endl;
   // Create a soft link to the most recent model in order to make it
   // easier to refer to it in a shell script.
   if (!softlink_created) {
     string softlink = "latest_model.params";
-    if (compress)
-      softlink += ".gz";
 
     if (system((string("rm -f ") + softlink).c_str()) == 0
         && system(("ln -s " + model_fname + " " + softlink).c_str()) == 0) {
@@ -465,7 +449,7 @@ void LSTMParser::SaveModel(const string& model_fname, bool compress,
 
 void LSTMParser::Train(const TrainingCorpus& corpus,
                        const TrainingCorpus& dev_corpus, const double unk_prob,
-                       const string& model_fname, bool compress,
+                       const string& model_fname,
                        const volatile bool* requested_stop) {
   bool softlink_created = false;
   int best_correct_heads = 0;
@@ -581,7 +565,7 @@ void LSTMParser::Train(const TrainingCorpus& corpus,
            << endl;
       if (correct_heads > best_correct_heads) {
         best_correct_heads = correct_heads;
-        SaveModel(model_fname, compress, softlink_created);
+        SaveModel(model_fname, softlink_created);
         softlink_created = true;
       }
     }

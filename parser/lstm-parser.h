@@ -1,15 +1,9 @@
 #ifndef LSTM_PARSER_H
 #define LSTM_PARSER_H
 
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <boost/serialization/unordered_map.hpp>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -25,6 +19,7 @@
 #include "cnn/lstm.h"
 #include "cnn/rnn.h"
 #include "corpus.h"
+#include "eos/portable_archive.hpp"
 
 
 namespace lstm_parser {
@@ -160,23 +155,19 @@ public:
                          bool finalize=true);
 
   explicit LSTMParser(const std::string& model_path) :
-          kUNK(vocab.GetOrAddWord(vocab.UNK)),
-          kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
+      kUNK(vocab.GetOrAddWord(vocab.UNK)),
+      kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
     std::cerr << "Loading model from " << model_path << "...";
-    std::ifstream model_file(model_path.c_str());
-    if (boost::algorithm::ends_with(model_path, ".gz")) {
-      std::ifstream model_stream(model_path.c_str());
-      boost::iostreams::filtering_streambuf<boost::iostreams::input> filter;
-      filter.push(boost::iostreams::gzip_decompressor());
-      filter.push(model_stream);
-      boost::archive::binary_iarchive archive(filter);
-      archive >> *this;
-    } else {
-      boost::archive::text_iarchive archive(model_file);
-      archive >> *this;
-    }
-    std::cerr << "done." << std::endl;
+    auto t_start = std::chrono::high_resolution_clock::now();
+    std::ifstream model_file(model_path.c_str(), std::ios::binary);
+    eos::portable_iarchive archive(model_file);
+    archive >> *this;
+    auto t_end = std::chrono::high_resolution_clock::now();
+    auto ms_passed =
+        std::chrono::duration<double, std::milli>(t_end - t_start).count();
+    std::cerr << "done. (Loading took " << ms_passed << " milliseconds.)" << std::endl;
   }
+
 
   template <class Archive>
   explicit LSTMParser(Archive* archive) :
@@ -202,7 +193,7 @@ public:
 
   void Train(const TrainingCorpus& corpus, const TrainingCorpus& dev_corpus,
              const double unk_prob, const std::string& model_fname,
-             bool compress, const volatile bool* requested_stop = nullptr);
+             const volatile bool* requested_stop = nullptr);
 
   void Test(const Corpus& corpus) {
     DoTest(corpus, false, true);
@@ -240,8 +231,7 @@ protected:
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& int_to_words, double* right);
 
-  void SaveModel(const std::string& model_fname, bool compress,
-                 bool softlink_created);
+  void SaveModel(const std::string& model_fname, bool softlink_created);
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {

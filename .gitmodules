@@ -1,0 +1,3 @@
+[submodule "eos-portable-archive"]
+	path = eos
+	url = https://github.com/duncanka/eos-portable-archive.git

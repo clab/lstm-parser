@@ -32,7 +32,6 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
         ("unk_prob,u", po::value<double>()->default_value(0.2),
          "Probably with which to replace singletons with UNK in training data")
         ("model,m", po::value<string>(), "Load saved model from this file")
-        ("compress,c", "Whether to compress the model when saving")
         ("use_pos_tags,P", "make POS tags visible to parser")
         ("layers,l", po::value<unsigned>()->default_value(2),
          "number of LSTM layers")
@@ -87,7 +86,6 @@ int main(int argc, char** argv) {
   const bool train = conf.count("train");
   const bool test = conf.count("test");
   const bool evaluate = conf.count("evaluate");
-  const bool compress = conf.count("compress");
   const bool load_model = conf.count("model");
 
   ParserOptions cmd_options {
@@ -166,12 +164,10 @@ int main(int argc, char** argv) {
        << '_' << parser->options.pos_dim
        << '_' << parser->options.rel_dim
        << "-pid" << getpid() << ".params";
-    if (compress)
-      os << ".gz";
     const string fname = os.str();
     cerr << "Writing parameters to file: " << fname << endl;
     parser->Train(training_corpus, *dev_corpus, parser->options.unk_prob, fname,
-                  compress, &requested_stop);
+                  &requested_stop);
   }
 
   if (evaluate) {

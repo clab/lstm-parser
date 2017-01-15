@@ -212,8 +212,24 @@ protected:
 
 class TrainingCorpus : public Corpus {
 public:
-  TrainingCorpus(CorpusVocabulary* vocab) : Corpus(vocab) {}
   std::vector<std::vector<unsigned>> correct_act_sent;
+
+protected:
+  class OracleTransitionsCorpusReader : public CorpusReader {
+  public:
+    OracleTransitionsCorpusReader(bool is_training) :
+        is_training(is_training) {
+    }
+  protected:
+    bool is_training; // can be dev rather than actual training
+  };
+
+  TrainingCorpus(CorpusVocabulary* vocab,
+                 const OracleTransitionsCorpusReader& reader,
+                 const std::string& file) :
+      Corpus(vocab, reader, file) {}
+
+  TrainingCorpus(CorpusVocabulary* vocab) : Corpus(vocab) {}
 };
 
 
@@ -222,22 +238,17 @@ public:
   friend class OracleTransitionsCorpusReader;
 
   bool USE_SPELLING = false;
-
-  std::vector<std::vector<unsigned>> correct_act_sent;
   std::set<unsigned> singletons;
 
   ParserTrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
                        bool is_training) :
-      TrainingCorpus(vocab) {
-    OracleTransitionsCorpusReader reader(is_training);
-    reader.ReadSentences(file, this);
-  }
+      TrainingCorpus(vocab, OracleParseTransitionsReader(is_training), file) {}
 
 private:
-  class OracleTransitionsCorpusReader : public CorpusReader {
+  class OracleParseTransitionsReader : public OracleTransitionsCorpusReader{
   public:
-    OracleTransitionsCorpusReader(bool is_training) :
-        is_training(is_training) {}
+    OracleParseTransitionsReader(bool is_training) :
+        OracleTransitionsCorpusReader(is_training) {}
 
     virtual void ReadSentences(const std::string& file, Corpus* corpus) const {
       ParserTrainingCorpus* training_corpus =
@@ -245,7 +256,7 @@ private:
       LoadCorrectActions(file, training_corpus);
     }
 
-    virtual ~OracleTransitionsCorpusReader() {};
+    virtual ~OracleParseTransitionsReader() {};
 
     static inline unsigned UTF8Len(unsigned char x) {
       if (x < 0x80) return 1;
@@ -257,7 +268,6 @@ private:
       else return 0;
     }
   private:
-    bool is_training; // can be dev rather than actual training
     void LoadCorrectActions(const std::string& file,
                             ParserTrainingCorpus* corpus) const;
   };

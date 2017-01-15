@@ -94,7 +94,7 @@ void ParserTrainingCorpus::CountSingletons() {
 }
 
 
-void ParserTrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
+void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
     const string& file, ParserTrainingCorpus* corpus) const {
   // TODO: break up this function?
   cerr << "Loading " << (is_training ? "training" : "dev")

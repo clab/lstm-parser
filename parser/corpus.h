@@ -207,11 +207,17 @@ protected:
   // Corpus for subclasses to inherit and use. Subclasses are then responsible
   // for doing any corpus-reading or setup.
   Corpus(CorpusVocabulary* vocab) : vocab(vocab) {}
-
 };
 
 
 class TrainingCorpus : public Corpus {
+public:
+  TrainingCorpus(CorpusVocabulary* vocab) : Corpus(vocab) {}
+  std::vector<std::vector<unsigned>> correct_act_sent;
+};
+
+
+class ParserTrainingCorpus : public TrainingCorpus {
 public:
   friend class OracleTransitionsCorpusReader;
 
@@ -220,9 +226,9 @@ public:
   std::vector<std::vector<unsigned>> correct_act_sent;
   std::set<unsigned> singletons;
 
-  TrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
-                 bool is_training) :
-      Corpus(vocab) {
+  ParserTrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
+                       bool is_training) :
+      TrainingCorpus(vocab) {
     OracleTransitionsCorpusReader reader(is_training);
     reader.ReadSentences(file, this);
   }
@@ -234,7 +240,8 @@ private:
         is_training(is_training) {}
 
     virtual void ReadSentences(const std::string& file, Corpus* corpus) const {
-      TrainingCorpus* training_corpus = static_cast<TrainingCorpus *>(corpus);
+      ParserTrainingCorpus* training_corpus =
+          static_cast<ParserTrainingCorpus *>(corpus);
       LoadCorrectActions(file, training_corpus);
     }
 
@@ -252,7 +259,7 @@ private:
   private:
     bool is_training; // can be dev rather than actual training
     void LoadCorrectActions(const std::string& file,
-                            TrainingCorpus* corpus) const;
+                            ParserTrainingCorpus* corpus) const;
   };
 
   static inline void ReplaceStringInPlace(std::string* subject,

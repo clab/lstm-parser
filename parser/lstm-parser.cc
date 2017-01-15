@@ -447,9 +447,9 @@ void LSTMParser::SaveModel(const string& model_fname, bool softlink_created) {
 }
 
 
-void LSTMParser::Train(const TrainingCorpus& corpus,
-                       const TrainingCorpus& dev_corpus, const double unk_prob,
-                       const string& model_fname,
+void LSTMParser::Train(const ParserTrainingCorpus& corpus,
+                       const ParserTrainingCorpus& dev_corpus,
+                       const double unk_prob, const string& model_fname,
                        const volatile bool* requested_stop) {
   bool softlink_created = false;
   int best_correct_heads = 0;
@@ -627,11 +627,11 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
     }
 
     if (evaluate) {
-      // Downcast to TrainingCorpus to get gold-standard data. We can only get
-      // here if this function was called by Evaluate, which statically checks
-      // that the corpus is in fact a TrainingCorpus, so this cast is safe.
-      const TrainingCorpus& training_corpus =
-          static_cast<const TrainingCorpus&>(corpus);
+      // Downcast to ParserTrainingCorpus to get gold-standard data. We can only
+      // get here if this function was called by Evaluate, which statically
+      // checks that the corpus is in fact a TrainingCorpus, so casting is safe.
+      const ParserTrainingCorpus& training_corpus =
+          static_cast<const ParserTrainingCorpus&>(corpus);
       const vector<unsigned>& actions = training_corpus.correct_act_sent[sii];
       ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
                                        corpus.vocab->actions_to_arc_labels,

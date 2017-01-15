@@ -191,15 +191,16 @@ public:
       const std::vector<std::string>& actions_to_arc_labels,
       bool labeled = false);
 
-  void Train(const TrainingCorpus& corpus, const TrainingCorpus& dev_corpus,
-             const double unk_prob, const std::string& model_fname,
+  void Train(const ParserTrainingCorpus& corpus,
+             const ParserTrainingCorpus& dev_corpus, const double unk_prob,
+             const std::string& model_fname,
              const volatile bool* requested_stop = nullptr);
 
   void Test(const Corpus& corpus) {
     DoTest(corpus, false, true);
   }
 
-  void Evaluate(const TrainingCorpus& corpus, bool output_parses=false) {
+  void Evaluate(const ParserTrainingCorpus& corpus, bool output_parses=false) {
     DoTest(corpus, true, output_parses);
   }
 

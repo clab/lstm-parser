@@ -135,7 +135,7 @@ int main(int argc, char** argv) {
     parser.reset(new LSTMParser(cmd_options, words, false));
   }
 
-  unique_ptr<TrainingCorpus> dev_corpus; // shared by train/evaluate
+  unique_ptr<ParserTrainingCorpus> dev_corpus; // shared by train/evaluate
 
   if (train) {
     if (!conf.count("training_data") || !conf.count("dev_data")) {
@@ -145,14 +145,16 @@ int main(int argc, char** argv) {
     }
 
     signal(SIGINT, signal_callback_handler);
-    TrainingCorpus training_corpus(&parser->vocab,
-                                   conf["training_data"].as<string>(), true);
+    ParserTrainingCorpus training_corpus(&parser->vocab,
+                                         conf["training_data"].as<string>(),
+                                         true);
     parser->FinalizeVocab();
     cerr << "Total number of words: " << training_corpus.vocab->CountWords()
          << endl;
     // OOV words will be replaced by UNK tokens
-    dev_corpus.reset(new TrainingCorpus(&parser->vocab,
-                                        conf["dev_data"].as<string>(), false));
+    dev_corpus.reset(
+        new ParserTrainingCorpus(&parser->vocab, conf["dev_data"].as<string>(),
+                                 false));
 
     ostringstream os;
     os << "parser_" << (parser->options.use_pos ? "pos" : "nopos")
@@ -180,8 +182,8 @@ int main(int argc, char** argv) {
     cerr << "Evaluating model on " << conf["dev_data"].as<string>() << endl;
     if (!train) { // Didn't already load dev corpus for training
       dev_corpus.reset(
-          new TrainingCorpus(&parser->vocab, conf["dev_data"].as<string>(),
-                             false));
+          new ParserTrainingCorpus(&parser->vocab,
+                                   conf["dev_data"].as<string>(), false));
     }
     parser->Evaluate(*dev_corpus);
   }

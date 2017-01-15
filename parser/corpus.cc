@@ -79,7 +79,7 @@ void ConllUCorpusReader::ReadSentences(const string& file,
 
 
 
-void TrainingCorpus::CountSingletons() {
+void ParserTrainingCorpus::CountSingletons() {
   // compute the singletons in the parser's training data
   map<unsigned, unsigned> counts;
   for (const auto& sent : sentences) {
@@ -94,8 +94,8 @@ void TrainingCorpus::CountSingletons() {
 }
 
 
-void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
-    const string& file, TrainingCorpus* corpus) const {
+void ParserTrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
+    const string& file, ParserTrainingCorpus* corpus) const {
   // TODO: break up this function?
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;

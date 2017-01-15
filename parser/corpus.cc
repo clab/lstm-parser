@@ -78,7 +78,6 @@ void ConllUCorpusReader::ReadSentences(const string& file,
 }
 
 
-
 void ParserTrainingCorpus::CountSingletons() {
   // compute the singletons in the parser's training data
   map<unsigned, unsigned> counts;
@@ -94,9 +93,9 @@ void ParserTrainingCorpus::CountSingletons() {
 }
 
 
-void ParserTrainingCorpus::OracleParseTransitionsReader::RecordWord(
+void TrainingCorpus::OracleTransitionsCorpusReader::RecordWord(
     const string& word, const string& pos, unsigned next_token_index,
-    CorpusVocabulary* vocab, ParserTrainingCorpus* corpus,
+    CorpusVocabulary* vocab, TrainingCorpus* corpus,
     map<unsigned, unsigned>* sentence, map<unsigned, unsigned>* sentence_pos,
     map<unsigned, string>* sentence_unk_surface_forms) const {
   // We assume that we'll have seen all POS tags in training, so don't
@@ -146,9 +145,10 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::RecordWord(
   (*sentence_pos)[next_token_index] = pos_id;
 }
 
-void ParserTrainingCorpus::OracleParseTransitionsReader::RecordAction(
+
+void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
     const string& action, bool start_of_sentence, CorpusVocabulary* vocab,
-    ParserTrainingCorpus* corpus) const {
+    TrainingCorpus* corpus) const {
   auto PushAction = // should be inlined; defined here for DRY reasons
       [corpus, start_of_sentence](unsigned action_index) {
     if (start_of_sentence)
@@ -179,12 +179,29 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::RecordAction(
 }
 
 
+void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
+    TrainingCorpus* corpus, map<unsigned, unsigned>* sentence,
+    map<unsigned, unsigned>* sentence_pos,
+    map<unsigned, string>* sentence_unk_surface_forms) const {
+  // Store the sentence variables and clear them for the next sentence.
+  corpus->sentences.push_back({});
+  corpus->sentences.back().swap(*sentence);
+  corpus->sentences_pos.push_back({});
+  corpus->sentences_pos.back().swap(*sentence_pos);
+  if (!is_training) {
+    corpus->sentences_unk_surface_forms.push_back({});
+    corpus->sentences_unk_surface_forms.back().swap(
+        *sentence_unk_surface_forms);
+  }
+}
+
+
 void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
     const string& file, ParserTrainingCorpus* corpus) const {
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;
-  ifstream actionsFile(file);
-  string lineS;
+  ifstream actions_file(file);
+  string line;
   CorpusVocabulary* vocab = corpus->vocab;
 
   bool next_is_action_line = false;
@@ -217,24 +234,16 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
     }
   };
 
-  while (getline(actionsFile, lineS)) {
-    ReplaceStringInPlace(&lineS, "-RRB-", "_RRB_");
-    ReplaceStringInPlace(&lineS, "-LRB-", "_LRB_");
+  while (getline(actions_file, line)) {
+    ReplaceStringInPlace(&line, "-RRB-", "_RRB_");
+    ReplaceStringInPlace(&line, "-LRB-", "_LRB_");
     // An empty line marks the end of a sentence.
-    if (lineS.empty()) {
+    if (line.empty()) {
       next_is_action_line = false;
       if (!first) { // if first, first line is blank, but no sentence yet
         FixRootID();
-        // Store the sentence variables and clear them for the next sentence.
-        corpus->sentences.push_back({});
-        corpus->sentences.back().swap(sentence);
-        corpus->sentences_pos.push_back({});
-        corpus->sentences_pos.back().swap(sentence_pos);
-        if (!is_training) {
-          corpus->sentences_unk_surface_forms.push_back({});
-          corpus->sentences_unk_surface_forms.back().swap(
-              sentence_unk_surface_forms);
-        }
+        RecordSentence(corpus, &sentence, &sentence_pos,
+                       &sentence_unk_surface_forms);
       }
       start_of_sentence = true;
       continue; // don't update next_is_action_line
@@ -247,9 +256,9 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
         // the initial line in each sentence should look like:
         // [][the-det, cat-noun, is-verb, on-adp, the-det, mat-noun, ,-punct, ROOT-ROOT]
         // first, get rid of the square brackets.
-        lineS = lineS.substr(3, lineS.size() - 4);
+        line = line.substr(3, line.size() - 4);
         // read the initial line, token by token "the-det," "cat-noun," ...
-        istringstream iss(lineS);
+        istringstream iss(line);
         do {
           string word;
           iss >> word;
@@ -283,7 +292,7 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
         } while (iss);
       }
     } else { // next_is_action_line
-      RecordAction(lineS, start_of_sentence, vocab, corpus);
+      RecordAction(line, start_of_sentence, vocab, corpus);
       start_of_sentence = false;
     }
 
@@ -293,15 +302,11 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
   // Add the last sentence.
   if (sentence.size() > 0) {
     FixRootID();
-    corpus->sentences.push_back(move(sentence));
-    corpus->sentences_pos.push_back(move(sentence_pos));
-    if (!is_training) {
-      corpus->sentences_unk_surface_forms.push_back(
-          move(sentence_unk_surface_forms));
-    }
+    RecordSentence(corpus, &sentence, &sentence_pos,
+                   &sentence_unk_surface_forms);
   }
 
-  actionsFile.close();
+  actions_file.close();
 
   cerr << "done." << "\n";
   if (is_training) {

@@ -213,6 +213,7 @@ protected:
 class TrainingCorpus : public Corpus {
 public:
   std::vector<std::vector<unsigned>> correct_act_sent;
+  bool USE_SPELLING = false;
 
 protected:
   class OracleTransitionsCorpusReader : public CorpusReader {
@@ -230,8 +231,34 @@ protected:
         pos += replace.length();
       }
     }
+
   protected:
     bool is_training; // can be dev rather than actual training
+
+    void RecordWord(
+        const std::string& word, const std::string& pos,
+        unsigned next_token_index, CorpusVocabulary* vocab,
+        TrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,
+        std::map<unsigned, unsigned>* sentence_pos,
+        std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
+
+    void RecordAction(const std::string& action, bool start_of_sentence,
+                      CorpusVocabulary* vocab, TrainingCorpus* corpus) const;
+
+    void RecordSentence(
+        TrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,
+        std::map<unsigned, unsigned>* sentence_pos,
+        std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
+
+    static inline unsigned UTF8Len(unsigned char x) {
+      if (x < 0x80) return 1;
+      else if ((x >> 5) == 0x06) return 2;
+      else if ((x >> 4) == 0x0e) return 3;
+      else if ((x >> 3) == 0x1e) return 4;
+      else if ((x >> 2) == 0x3e) return 5;
+      else if ((x >> 1) == 0x7e) return 6;
+      else return 0;
+    }
   };
 
   // Don't provide access to reader constructor -- object won't be fully
@@ -244,7 +271,6 @@ class ParserTrainingCorpus : public TrainingCorpus {
 public:
   friend class OracleTransitionsCorpusReader;
 
-  bool USE_SPELLING = false;
   std::set<unsigned> singletons;
 
   ParserTrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
@@ -261,33 +287,11 @@ private:
 
     virtual void ReadSentences(const std::string& file, Corpus* corpus) const {
       ParserTrainingCorpus* training_corpus =
-          static_cast<ParserTrainingCorpus *>(corpus);
+          static_cast<ParserTrainingCorpus*>(corpus);
       LoadCorrectActions(file, training_corpus);
     }
 
     virtual ~OracleParseTransitionsReader() {};
-
-    static inline unsigned UTF8Len(unsigned char x) {
-      if (x < 0x80) return 1;
-      else if ((x >> 5) == 0x06) return 2;
-      else if ((x >> 4) == 0x0e) return 3;
-      else if ((x >> 3) == 0x1e) return 4;
-      else if ((x >> 2) == 0x3e) return 5;
-      else if ((x >> 1) == 0x7e) return 6;
-      else return 0;
-    }
-
-  protected:
-    void RecordWord(
-        const std::string& word, const std::string& pos,
-        unsigned next_token_index, CorpusVocabulary* vocab,
-        ParserTrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,
-        std::map<unsigned, unsigned>* sentence_pos,
-        std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
-
-    void RecordAction(const std::string& action, bool start_of_sentence,
-                      CorpusVocabulary* vocab,
-                      ParserTrainingCorpus* corpus) const;
 
   private:
     void LoadCorrectActions(const std::string& file,

@@ -629,7 +629,8 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
     if (evaluate) {
       // Downcast to ParserTrainingCorpus to get gold-standard data. We can only
       // get here if this function was called by Evaluate, which statically
-      // checks that the corpus is in fact a TrainingCorpus, so casting is safe.
+      // checks that the corpus is in fact a ParserTrainingCorpus, so this cast
+      // is safe.
       const ParserTrainingCorpus& training_corpus =
           static_cast<const ParserTrainingCorpus&>(corpus);
       const vector<unsigned>& actions = training_corpus.correct_act_sent[sii];

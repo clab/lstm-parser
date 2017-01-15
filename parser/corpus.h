@@ -91,7 +91,7 @@ public:
     }
   }
 
-  static inline std::string GetLabelForAction(const std::string& action) {
+  virtual std::string GetLabelForAction(const std::string& action) {
     if (boost::starts_with(action, "RIGHT-ARC") ||
         boost::starts_with(action, "LEFT-ARC")) {
       size_t first_char_in_rel = action.find('(') + 1;
@@ -224,11 +224,8 @@ protected:
     bool is_training; // can be dev rather than actual training
   };
 
-  TrainingCorpus(CorpusVocabulary* vocab,
-                 const OracleTransitionsCorpusReader& reader,
-                 const std::string& file) :
-      Corpus(vocab, reader, file) {}
-
+  // Don't provide access to reader constructor -- object won't be fully
+  // constructed yet, so it would segfault.
   TrainingCorpus(CorpusVocabulary* vocab) : Corpus(vocab) {}
 };
 
@@ -242,7 +239,9 @@ public:
 
   ParserTrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
                        bool is_training) :
-      TrainingCorpus(vocab, OracleParseTransitionsReader(is_training), file) {}
+      TrainingCorpus(vocab) {
+    OracleParseTransitionsReader(is_training).ReadSentences(file, this);
+  }
 
 private:
   class OracleParseTransitionsReader : public OracleTransitionsCorpusReader{
@@ -267,6 +266,19 @@ private:
       else if ((x >> 1) == 0x7e) return 6;
       else return 0;
     }
+
+  protected:
+    void RecordWord(
+        const std::string& word, const std::string& pos,
+        unsigned next_token_index, CorpusVocabulary* vocab,
+        ParserTrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,
+        std::map<unsigned, unsigned>* sentence_pos,
+        std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
+
+    void RecordAction(const std::string& action, bool start_of_sentence,
+                      CorpusVocabulary* vocab,
+                      ParserTrainingCorpus* corpus) const;
+
   private:
     void LoadCorrectActions(const std::string& file,
                             ParserTrainingCorpus* corpus) const;

@@ -94,9 +94,93 @@ void ParserTrainingCorpus::CountSingletons() {
 }
 
 
+void ParserTrainingCorpus::OracleParseTransitionsReader::RecordWord(
+    const string& word, const string& pos, unsigned next_token_index,
+    CorpusVocabulary* vocab, ParserTrainingCorpus* corpus,
+    map<unsigned, unsigned>* sentence, map<unsigned, unsigned>* sentence_pos,
+    map<unsigned, string>* sentence_unk_surface_forms) const {
+  // We assume that we'll have seen all POS tags in training, so don't
+  // worry about OOV tags.
+  unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
+                                         &vocab->int_to_pos);
+
+  unsigned word_id;
+  if (is_training) {
+    unsigned num_words = vocab->CountWords(); // store for later check
+    word_id = vocab->GetOrAddWord(word, true);
+    if (vocab->CountWords() > num_words) {
+      // A new word was added; add its chars, too.
+      unsigned j = 0;
+      while (j < word.length()) {
+        unsigned char_utf8_len = UTF8Len(word[j]);
+        string next_utf8_char = word.substr(j, char_utf8_len);
+        vocab->GetOrAddEntry(next_utf8_char, &vocab->chars_to_int,
+                             &vocab->int_to_chars);
+        j += char_utf8_len;
+      }
+    } else {
+      // It's an old word. Make sure it's marked as present in training.
+      vocab->int_to_training_word[word_id] = true;
+    }
+  } else {
+    // add an empty string for any token except OOVs (it is easy to
+    // recover the surface form of non-OOV using intToWords(id)).
+    // OOV word
+    if (corpus->USE_SPELLING) {
+      word_id = vocab->GetOrAddWord(word); // don't record as training
+      (*sentence_unk_surface_forms)[next_token_index] = "";
+    } else {
+      auto word_iter = vocab->words_to_int.find(word);
+      if (word_iter == vocab->words_to_int.end()) {
+        // Save the surface form of this OOV.
+        (*sentence_unk_surface_forms)[next_token_index] = word;
+        word_id = vocab->words_to_int[vocab->UNK];
+      } else {
+        (*sentence_unk_surface_forms)[next_token_index] = "";
+        word_id = word_iter->second;
+      }
+    }
+  }
+
+  (*sentence)[next_token_index] = word_id;
+  (*sentence_pos)[next_token_index] = pos_id;
+}
+
+void ParserTrainingCorpus::OracleParseTransitionsReader::RecordAction(
+    const string& action, bool start_of_sentence, CorpusVocabulary* vocab,
+    ParserTrainingCorpus* corpus) const {
+  auto PushAction = // should be inlined; defined here for DRY reasons
+      [corpus, start_of_sentence](unsigned action_index) {
+    if (start_of_sentence)
+      corpus->correct_act_sent.push_back( {action_index} );
+    else
+      corpus->correct_act_sent.back().push_back(action_index);
+  };
+
+  auto action_iter = find(vocab->actions.begin(), vocab->actions.end(), action);
+  if (action_iter != vocab->actions.end()) {
+    unsigned action_index = distance(vocab->actions.begin(), action_iter);
+    PushAction(action_index);
+  } else { // A not-previously-seen action
+    if (is_training) {
+      vocab->actions.push_back(action);
+      unsigned action_index = vocab->actions.size() - 1;
+      PushAction(action_index);
+    } else {
+      // TODO: right now, new actions which haven't been observed in
+      // training are not added to correct_act_sent. In dev, this may
+      // be a problem if there is little training data.
+      cerr << "WARNING: encountered unknown transition in dev corpus: "
+           << action << endl;
+      if (start_of_sentence)
+      corpus->correct_act_sent.push_back({});
+    }
+  }
+}
+
+
 void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
     const string& file, ParserTrainingCorpus* corpus) const {
-  // TODO: break up this function?
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;
   ifstream actionsFile(file);
@@ -192,84 +276,14 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
             pos = CorpusVocabulary::ROOT;
           }
 
-          // We assume that we'll have seen all POS tags in training, so don't
-          // worry about OOV tags.
-          unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
-                                                 &vocab->int_to_pos);
           // Use 1-indexed token IDs to leave room for ROOT in position 0.
           unsigned next_token_index = sentence.size() + 1;
-          unsigned word_id;
-          if (is_training) {
-            unsigned num_words = vocab->CountWords(); // store for later check
-            word_id = vocab->GetOrAddWord(word, true);
-            if (vocab->CountWords() > num_words) {
-              // A new word was added; add its chars, too.
-              unsigned j = 0;
-              while (j < word.length()) {
-                unsigned char_utf8_len = UTF8Len(word[j]);
-                string next_utf8_char = word.substr(j, char_utf8_len);
-                vocab->GetOrAddEntry(next_utf8_char, &vocab->chars_to_int,
-                                     &vocab->int_to_chars);
-                j += char_utf8_len;
-              }
-            } else {
-              // It's an old word. Make sure it's marked as present in training.
-              vocab->int_to_training_word[word_id] = true;
-            }
-          } else {
-            // add an empty string for any token except OOVs (it is easy to
-            // recover the surface form of non-OOV using intToWords(id)).
-            // OOV word
-            if (corpus->USE_SPELLING) {
-              word_id = vocab->GetOrAddWord(word); // don't record as training
-              sentence_unk_surface_forms[next_token_index] = "";
-            } else {
-              auto word_iter = vocab->words_to_int.find(word);
-              if (word_iter == vocab->words_to_int.end()) {
-                // Save the surface form of this OOV.
-                sentence_unk_surface_forms[next_token_index] = word;
-                word_id = vocab->words_to_int[vocab->UNK];
-              } else {
-                sentence_unk_surface_forms[next_token_index] = "";
-                word_id = word_iter->second;
-              }
-            }
-          }
-
-          sentence[next_token_index] = word_id;
-          sentence_pos[next_token_index] = pos_id;
+          RecordWord(word, pos, next_token_index, vocab, corpus, &sentence,
+                     &sentence_pos, &sentence_unk_surface_forms);
         } while (iss);
       }
-    } else if (next_is_action_line) {
-      auto action_iter = find(vocab->actions.begin(), vocab->actions.end(),
-                              lineS);
-      if (action_iter != vocab->actions.end()) {
-        unsigned action_index = distance(vocab->actions.begin(), action_iter);
-        if (start_of_sentence)
-          corpus->correct_act_sent.push_back({action_index});
-        else
-          corpus->correct_act_sent.back().push_back(action_index);
-      } else { // A not-previously-seen action
-        if (is_training) {
-          vocab->actions.push_back(lineS);
-          vocab->actions_to_arc_labels.push_back(
-              vocab->GetLabelForAction(lineS));
-
-          unsigned action_index = vocab->actions.size() - 1;
-          if (start_of_sentence)
-            corpus->correct_act_sent.push_back({action_index});
-          else
-            corpus->correct_act_sent.back().push_back(action_index);
-        } else {
-          // TODO: right now, new actions which haven't been observed in
-          // training are not added to correct_act_sent. In dev, this may
-          // be a problem if there is little training data.
-          cerr << "WARNING: encountered unknown transition in dev corpus: "
-               << lineS << endl;
-          if (start_of_sentence)
-            corpus->correct_act_sent.push_back({});
-        }
-      }
+    } else { // next_is_action_line
+      RecordAction(lineS, start_of_sentence, vocab, corpus);
       start_of_sentence = false;
     }
 
@@ -292,6 +306,7 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
   cerr << "done." << "\n";
   if (is_training) {
     for (auto a : vocab->actions) {
+      vocab->actions_to_arc_labels.push_back(vocab->GetLabelForAction(a));
       cerr << a << "\n";
     }
   }

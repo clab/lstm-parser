@@ -1,8 +1,12 @@
 project(lstm-parser)
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif(NOT CMAKE_BUILD_TYPE)
+
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(CMAKE_CXX_FLAGS "-Wall -std=c++11 -O3 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
 
 enable_testing()
 

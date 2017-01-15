@@ -134,8 +134,8 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
   };
 
   while (getline(actionsFile, lineS)) {
-    ReplaceStringInPlace(lineS, "-RRB-", "_RRB_");
-    ReplaceStringInPlace(lineS, "-LRB-", "_LRB_");
+    ReplaceStringInPlace(&lineS, "-RRB-", "_RRB_");
+    ReplaceStringInPlace(&lineS, "-LRB-", "_LRB_");
     // An empty line marks the end of a sentence.
     if (lineS.empty()) {
       next_is_action_line = false;

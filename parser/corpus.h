@@ -250,17 +250,17 @@ private:
       else return 0;
     }
   private:
-    bool is_training;
+    bool is_training; // can be dev rather than actual training
     void LoadCorrectActions(const std::string& file,
                             TrainingCorpus* corpus) const;
   };
 
-  static inline void ReplaceStringInPlace(std::string& subject,
+  static inline void ReplaceStringInPlace(std::string* subject,
                                           const std::string& search,
                                           const std::string& replace) {
     size_t pos = 0;
-    while ((pos = subject.find(search, pos)) != std::string::npos) {
-      subject.replace(pos, search.length(), replace);
+    while ((pos = subject->find(search, pos)) != std::string::npos) {
+      subject->replace(pos, search.length(), replace);
       pos += replace.length();
     }
   }

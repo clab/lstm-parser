@@ -100,11 +100,12 @@ void ParserTrainingCorpus::CountSingletons() {
 
 void TrainingCorpus::OracleTransitionsCorpusReader::RecordWord(
     const string& word, const string& pos, unsigned next_token_index,
-    CorpusVocabulary* vocab, TrainingCorpus* corpus,
-    map<unsigned, unsigned>* sentence, map<unsigned, unsigned>* sentence_pos,
+    TrainingCorpus* corpus, map<unsigned, unsigned>* sentence,
+    map<unsigned, unsigned>* sentence_pos,
     map<unsigned, string>* sentence_unk_surface_forms) const {
   // We assume that we'll have seen all POS tags in training, so don't
   // worry about OOV tags.
+  CorpusVocabulary* vocab = corpus->vocab;
   unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
                                          &vocab->int_to_pos);
 
@@ -152,8 +153,8 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordWord(
 
 
 void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
-    const string& action, CorpusVocabulary* vocab,
-    TrainingCorpus* corpus) const {
+    const string& action, TrainingCorpus* corpus) const {
+  CorpusVocabulary* vocab = corpus->vocab;
   auto action_iter = find(vocab->actions.begin(), vocab->actions.end(), action);
   if (action_iter != vocab->actions.end()) {
     unsigned action_index = distance(vocab->actions.begin(), action_iter);
@@ -163,6 +164,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
       vocab->actions.push_back(action);
       unsigned action_index = vocab->actions.size() - 1;
       corpus->correct_act_sent.back().push_back(action_index);
+      vocab->actions_to_arc_labels.push_back(vocab->GetLabelForAction(action));
     } else {
       // TODO: right now, new actions which haven't been observed in
       // training are not added to correct_act_sent. In dev, this may
@@ -286,12 +288,12 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
 
           // Use 1-indexed token IDs to leave room for ROOT in position 0.
           unsigned next_token_index = sentence.size() + 1;
-          RecordWord(word, pos, next_token_index, vocab, corpus, &sentence,
+          RecordWord(word, pos, next_token_index, corpus, &sentence,
                      &sentence_pos, &sentence_unk_surface_forms);
         } while (iss);
       }
     } else { // next_is_action_line
-      RecordAction(line, vocab, corpus);
+      RecordAction(line, corpus);
       start_of_sentence = false;
     }
 

@@ -44,6 +44,15 @@ public:
     AddEntry(BAD0, &chars_to_int, &int_to_chars);
   }
 
+  // Copy constructor: Copy everything except action-related stuff, on the
+  // assumption that we're copying the vocabulary for use in another task with
+  // different actions.
+  CorpusVocabulary(const CorpusVocabulary& other) :
+      words_to_int(other.words_to_int), int_to_words(other.int_to_words),
+      int_to_training_word(other.int_to_training_word),
+      pos_to_int(other.pos_to_int), int_to_pos(other.int_to_pos),
+      chars_to_int(other.chars_to_int), int_to_chars(other.int_to_chars) {}
+
   inline unsigned CountPOS() { return pos_to_int.size(); }
   inline unsigned CountWords() { return words_to_int.size(); }
   inline unsigned CountChars() { return chars_to_int.size(); }
@@ -237,13 +246,12 @@ protected:
 
     void RecordWord(
         const std::string& word, const std::string& pos,
-        unsigned next_token_index, CorpusVocabulary* vocab,
-        TrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,
+        unsigned next_token_index, TrainingCorpus* corpus,
+        std::map<unsigned, unsigned>* sentence,
         std::map<unsigned, unsigned>* sentence_pos,
         std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
 
-    void RecordAction(const std::string& action, CorpusVocabulary* vocab,
-                      TrainingCorpus* corpus) const;
+    void RecordAction(const std::string& action, TrainingCorpus* corpus) const;
 
     void RecordSentence(
         TrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,

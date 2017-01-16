@@ -173,7 +173,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
       cerr << "WARNING: encountered unknown transition in dev corpus: "
            << action << endl;
       if (start_of_sentence)
-      corpus->correct_act_sent.push_back({});
+        corpus->correct_act_sent.push_back({});
     }
   }
 }

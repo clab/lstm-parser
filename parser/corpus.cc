@@ -147,33 +147,23 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordWord(
 
 
 void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
-    const string& action, bool start_of_sentence, CorpusVocabulary* vocab,
+    const string& action, CorpusVocabulary* vocab,
     TrainingCorpus* corpus) const {
-  auto PushAction = // should be inlined; defined here for DRY reasons
-      [corpus, start_of_sentence](unsigned action_index) {
-    if (start_of_sentence)
-      corpus->correct_act_sent.push_back( {action_index} );
-    else
-      corpus->correct_act_sent.back().push_back(action_index);
-  };
-
   auto action_iter = find(vocab->actions.begin(), vocab->actions.end(), action);
   if (action_iter != vocab->actions.end()) {
     unsigned action_index = distance(vocab->actions.begin(), action_iter);
-    PushAction(action_index);
+    corpus->correct_act_sent.back().push_back(action_index);
   } else { // A not-previously-seen action
     if (is_training) {
       vocab->actions.push_back(action);
       unsigned action_index = vocab->actions.size() - 1;
-      PushAction(action_index);
+      corpus->correct_act_sent.back().push_back(action_index);
     } else {
       // TODO: right now, new actions which haven't been observed in
       // training are not added to correct_act_sent. In dev, this may
       // be a problem if there is little training data.
       cerr << "WARNING: encountered unknown transition in dev corpus: "
            << action << endl;
-      if (start_of_sentence)
-        corpus->correct_act_sent.push_back({});
     }
   }
 }
@@ -182,7 +172,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
 void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
     TrainingCorpus* corpus, map<unsigned, unsigned>* sentence,
     map<unsigned, unsigned>* sentence_pos,
-    map<unsigned, string>* sentence_unk_surface_forms) const {
+    map<unsigned, string>* sentence_unk_surface_forms, bool final) const {
   // Store the sentence variables and clear them for the next sentence.
   corpus->sentences.push_back({});
   corpus->sentences.back().swap(*sentence);
@@ -192,6 +182,9 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
     corpus->sentences_unk_surface_forms.push_back({});
     corpus->sentences_unk_surface_forms.back().swap(
         *sentence_unk_surface_forms);
+  }
+  if (!final) {
+    corpus->correct_act_sent.push_back({});
   }
 }
 
@@ -211,6 +204,7 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
   map<unsigned, unsigned> sentence;
   map<unsigned, unsigned> sentence_pos;
   map<unsigned, string> sentence_unk_surface_forms;
+  corpus->correct_act_sent.push_back({});
 
   // We'll need to make sure ROOT token has a consistent ID.
   // (Should get inlined; defined here for DRY purposes.)
@@ -292,7 +286,7 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
         } while (iss);
       }
     } else { // next_is_action_line
-      RecordAction(line, start_of_sentence, vocab, corpus);
+      RecordAction(line, vocab, corpus);
       start_of_sentence = false;
     }
 
@@ -303,7 +297,7 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
   if (sentence.size() > 0) {
     FixRootID();
     RecordSentence(corpus, &sentence, &sentence_pos,
-                   &sentence_unk_surface_forms);
+                   &sentence_unk_surface_forms, true);
   }
 
   actions_file.close();

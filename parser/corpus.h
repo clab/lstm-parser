@@ -242,13 +242,14 @@ protected:
         std::map<unsigned, unsigned>* sentence_pos,
         std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
 
-    void RecordAction(const std::string& action, bool start_of_sentence,
-                      CorpusVocabulary* vocab, TrainingCorpus* corpus) const;
+    void RecordAction(const std::string& action, CorpusVocabulary* vocab,
+                      TrainingCorpus* corpus) const;
 
     void RecordSentence(
         TrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,
         std::map<unsigned, unsigned>* sentence_pos,
-        std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
+        std::map<unsigned, std::string>* sentence_unk_surface_forms,
+        bool final = false) const;
 
     static inline unsigned UTF8Len(unsigned char x) {
       if (x < 0x80) return 1;

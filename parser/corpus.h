@@ -2,6 +2,7 @@
 #define CORPUS_H
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/regex.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <exception>
 #include <stddef.h>
@@ -91,13 +92,10 @@ public:
     }
   }
 
-  virtual std::string GetLabelForAction(const std::string& action) {
-    if (boost::starts_with(action, "RIGHT-ARC") ||
-        boost::starts_with(action, "LEFT-ARC")) {
-      size_t first_char_in_rel = action.find('(') + 1;
-      size_t last_char_in_rel = action.rfind(')') - 1;
-      return action.substr(
-          first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
+  static inline std::string GetLabelForAction(const std::string& action) {
+    boost::smatch match;
+    if (boost::regex_search(action, match, ARC_ACTION_REGEX)) {
+      return match[1];
     } else {
       return "NONE";
     }
@@ -105,6 +103,8 @@ public:
 
 private:
   friend class boost::serialization::access;
+
+  static const boost::regex ARC_ACTION_REGEX;
 
   template<class Archive, class VocabType>
   // Shared code: serialize the number-to-string mappings, from which the

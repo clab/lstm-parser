@@ -16,6 +16,11 @@ constexpr unsigned Corpus::ROOT_TOKEN_ID;
 const string CorpusVocabulary::BAD0 = "<BAD0>";
 const string CorpusVocabulary::UNK = "<UNK>";
 const string CorpusVocabulary::ROOT = "<ROOT>";
+// We assume that actions with arcs will be of the form
+// "action-name(arc-label)". Allow any non-paren characters, followed by the
+// label name in parens. (Group 1 is the label name.)
+const boost::regex CorpusVocabulary::ARC_ACTION_REGEX(
+    {"[^\\(\\)]+\\(([^\\(\\)]+)\\)"});
 const string ORACLE_ROOT_POS = "ROOT";
 
 

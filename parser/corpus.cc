@@ -270,14 +270,14 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
             word = word.substr(0, word.size() - 1);
           }
           // split the string (at '-') into word and POS tag.
-          size_t posIndex = word.rfind('-');
-          if (posIndex == string::npos) {
+          size_t pos_index = word.rfind('-');
+          if (pos_index == string::npos) {
             cerr << "can't find the dash in '" << word << "'"
                  << endl;
           }
-          assert(posIndex != string::npos);
-          string pos = word.substr(posIndex + 1);
-          word = word.substr(0, posIndex);
+          assert(pos_index != string::npos);
+          string pos = word.substr(pos_index + 1);
+          word = word.substr(0, pos_index);
 
           if (pos == ORACLE_ROOT_POS) {
             // Prevent any confusion with the actual word "ROOT".

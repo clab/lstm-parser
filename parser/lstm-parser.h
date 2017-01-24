@@ -181,7 +181,8 @@ public:
 
   ParseTree Parse(const std::map<unsigned, unsigned>& sentence,
                   const std::map<unsigned, unsigned>& sentence_pos,
-                  const CorpusVocabulary& vocab, bool labeled, double* correct);
+                  const CorpusVocabulary& vocab, bool labeled,
+                  double* correct = nullptr);
 
   // take a vector of actions and return a parse tree
   ParseTree RecoverParseTree(
@@ -209,7 +210,7 @@ public:
       const std::map<unsigned, unsigned>& sentence,
       const std::map<unsigned, unsigned>& sentence_pos,
       const CorpusVocabulary& vocab, cnn::ComputationGraph *cg,
-      double* correct);
+      double* correct = nullptr);
 
   void LoadPretrainedWords(const std::string& words_path);
 
@@ -230,7 +231,7 @@ protected:
       const std::map<unsigned, unsigned>& sentPos,
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& action_names,
-      const std::vector<std::string>& int_to_words, double* right);
+      const std::vector<std::string>& int_to_words, double* correct);
 
   void SaveModel(const std::string& model_fname, bool softlink_created);
 

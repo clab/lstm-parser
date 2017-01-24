@@ -339,7 +339,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     // If we have reference actions (for training), use the reference action.
     if (build_training_graph) {
       action = correct_actions[action_count];
-      if (best_a == action) {
+      if (correct && best_a == action) {
         (*correct)++;
       }
     }

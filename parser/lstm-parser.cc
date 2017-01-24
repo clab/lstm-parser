@@ -348,16 +348,16 @@ vector<unsigned> LSTMParser::LogProbParser(
     results.push_back(action);
 
     // add current action to action LSTM
-    Expression actione = lookup(*hg, p_a, action);
-    action_lstm.add_input(actione);
+    Expression action_e = lookup(*hg, p_a, action);
+    action_lstm.add_input(action_e);
 
     // get relation embedding from action (TODO: convert to rel from action?)
     Expression relation = lookup(*hg, p_r, action);
 
     // do action
-    const string& actionString = action_names[action];
-    const char ac = actionString[0];
-    const char ac2 = actionString[1];
+    const string& action_string = action_names[action];
+    const char ac = action_string[0];
+    const char ac2 = action_string[1];
 
     if (ac == 'S' && ac2 == 'H') {  // SHIFT
       assert(buffer.size() > 1); // dummy symbol means > 1 (not >= 1)

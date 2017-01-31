@@ -174,7 +174,7 @@ bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
 ParseTree LSTMParser::RecoverParseTree(
     const map<unsigned, unsigned>& sentence, const vector<unsigned>& actions,
     const vector<string>& action_names,
-    const vector<string>& actions_to_arc_labels, bool labeled) {
+    const vector<string>& actions_to_arc_labels, double logprob, bool labeled) {
   ParseTree tree(sentence, labeled);
   vector<int> bufferi(sentence.size() + 1);
   bufferi[0] = -999;
@@ -217,6 +217,8 @@ ParseTree LSTMParser::RecoverParseTree(
   }
   assert(bufferi.size() == 1);
   //assert(stacki.size() == 2);
+
+  tree.logprob = logprob;
   return tree;
 }
 
@@ -548,10 +550,10 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
         const map<unsigned, unsigned>& sentence = dev_corpus.sentences[sii];
         const map<unsigned, unsigned>& sentence_pos =
             dev_corpus.sentences_pos[sii];
-        ParseTree hyp = Parse(sentence, sentence_pos, vocab, false);
 
-        double lp = 0;
-        llh -= lp;
+        ParseTree hyp = Parse(sentence, sentence_pos, vocab, false);
+        llh += hyp.logprob;
+
         const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
         ParseTree ref = RecoverParseTree(
             sentence, actions, dev_corpus.vocab->actions,
@@ -602,8 +604,9 @@ ParseTree LSTMParser::Parse(const map<unsigned, unsigned>& sentence,
                             const CorpusVocabulary& vocab, bool labeled) {
   ComputationGraph cg;
   vector<unsigned> pred = LogProbParser(sentence, sentence_pos, vocab, &cg);
+  double lp = as_scalar(cg.incremental_forward());
   return RecoverParseTree(sentence, pred, vocab.actions,
-                          vocab.actions_to_arc_labels, labeled);
+                          vocab.actions_to_arc_labels, labeled, lp);
 }
 
 
@@ -643,10 +646,12 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
                                        corpus.vocab->actions_to_arc_labels,
                                        true);
       trs += actions.size();
+      llh += hyp.logprob;
       correct_heads += ComputeCorrect(ref, hyp);
       total_heads += sentence.size() - 1; // -1 to account for ROOT
     }
   }
+
   auto t_end = chrono::high_resolution_clock::now();
   if (evaluate) {
     cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs)

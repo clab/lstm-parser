@@ -71,11 +71,12 @@ public:
   static std::string NO_LABEL;
   // Barebones representation of a parse tree.
   const std::map<unsigned, unsigned>& sentence;
+  double logprob;
 
   ParseTree(const std::map<unsigned, unsigned>& sentence, bool labeled = true) :
       sentence(sentence),
-      arc_labels( labeled ? new std::map<unsigned, std::string> : nullptr) {
-  }
+      logprob(0),
+      arc_labels( labeled ? new std::map<unsigned, std::string> : nullptr) {}
 
   inline void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {
@@ -188,7 +189,7 @@ public:
       const std::map<unsigned, unsigned>& sentence,
       const std::vector<unsigned>& actions,
       const std::vector<std::string>& action_names,
-      const std::vector<std::string>& actions_to_arc_labels,
+      const std::vector<std::string>& actions_to_arc_labels, double logprob = 0,
       bool labeled = false);
 
   void Train(const ParserTrainingCorpus& corpus,

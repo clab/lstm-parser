@@ -227,7 +227,8 @@ vector<unsigned> LSTMParser::LogProbParser(
     const map<unsigned, unsigned>& sent,  // sentence with OOVs replaced
     const map<unsigned, unsigned>& sent_pos,
     const vector<unsigned>& correct_actions, const vector<string>& action_names,
-    const vector<string>& int_to_words, double* correct) {
+    const vector<string>& int_to_words, double* correct,
+    Expression* final_parser_state) {
   // TODO: break up this function?
   assert(finalized);
   vector<unsigned> results;
@@ -306,6 +307,7 @@ vector<unsigned> LSTMParser::LogProbParser(
   stack_lstm.add_input(stack.back());
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction
+  Expression p_t; // declared outside to allow access later
   while (stack.size() > 2 || buffer.size() > 1) {
     // get list of possible actions for the current parser state
     vector<unsigned> current_valid_actions;
@@ -317,7 +319,7 @@ vector<unsigned> LSTMParser::LogProbParser(
     }
 
     // p_t = pbias + S * slstm + B * blstm + A * almst
-    Expression p_t = affine_transform(
+    p_t = affine_transform(
         {pbias, S, stack_lstm.back(), B, buffer_lstm.back(), A,
          action_lstm.back()});
     Expression nlp_t = rectify(p_t);
@@ -424,6 +426,10 @@ vector<unsigned> LSTMParser::LogProbParser(
   assert(bufferi.size() == 1);
   Expression tot_neglogprob = -sum(log_probs);
   assert(tot_neglogprob.pg != nullptr);
+
+  if (final_parser_state) {
+    *final_parser_state = p_t;
+  }
   return results;
 }
 
@@ -573,10 +579,11 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
 }
 
 
+// TODO: fix this so that correct actually does something sometimes
 vector<unsigned> LSTMParser::LogProbParser(
     const map<unsigned, unsigned>& sentence,
     const map<unsigned, unsigned>& sentence_pos, const CorpusVocabulary& vocab,
-    ComputationGraph *cg, double* correct) {
+    ComputationGraph *cg, double* correct, Expression* final_parser_state) {
   map<unsigned, unsigned> tsentence(sentence); // sentence with OOVs replaced
   for (auto& index_and_id : tsentence) { // use reference to overwrite
     if (!vocab.int_to_training_word[index_and_id.second]) {
@@ -585,7 +592,7 @@ vector<unsigned> LSTMParser::LogProbParser(
   }
   return LogProbParser(cg, sentence, tsentence, sentence_pos,
                        vector<unsigned>(), vocab.actions,
-                       vocab.int_to_words, correct);
+                       vocab.int_to_words, correct, final_parser_state);
 }
 
 

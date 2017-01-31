@@ -210,7 +210,8 @@ public:
       const std::map<unsigned, unsigned>& sentence,
       const std::map<unsigned, unsigned>& sentence_pos,
       const CorpusVocabulary& vocab, cnn::ComputationGraph *cg,
-      double* correct = nullptr);
+      double* correct = nullptr,
+      cnn::expr::Expression* final_parser_state = nullptr);
 
   void LoadPretrainedWords(const std::string& words_path);
 
@@ -231,7 +232,8 @@ protected:
       const std::map<unsigned, unsigned>& sentPos,
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& action_names,
-      const std::vector<std::string>& int_to_words, double* correct);
+      const std::vector<std::string>& int_to_words, double* correct,
+      cnn::expr::Expression* final_parser_state = nullptr);
 
   void SaveModel(const std::string& model_fname, bool softlink_created);
 

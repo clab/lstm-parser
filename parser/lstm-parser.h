@@ -181,8 +181,7 @@ public:
 
   ParseTree Parse(const std::map<unsigned, unsigned>& sentence,
                   const std::map<unsigned, unsigned>& sentence_pos,
-                  const CorpusVocabulary& vocab, bool labeled,
-                  double* correct = nullptr);
+                  const CorpusVocabulary& vocab, bool labeled);
 
   // take a vector of actions and return a parse tree
   ParseTree RecoverParseTree(
@@ -210,7 +209,6 @@ public:
       const std::map<unsigned, unsigned>& sentence,
       const std::map<unsigned, unsigned>& sentence_pos,
       const CorpusVocabulary& vocab, cnn::ComputationGraph *cg,
-      double* correct = nullptr,
       cnn::expr::Expression* final_parser_state = nullptr);
 
   void LoadPretrainedWords(const std::string& words_path);

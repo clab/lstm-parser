@@ -541,7 +541,6 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
       // dev_size = 100;
       double llh = 0;
       double trs = 0;
-      double correct = 0;
       double correct_heads = 0;
       double total_heads = 0;
       auto t_start = chrono::high_resolution_clock::now();
@@ -549,7 +548,7 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
         const map<unsigned, unsigned>& sentence = dev_corpus.sentences[sii];
         const map<unsigned, unsigned>& sentence_pos =
             dev_corpus.sentences_pos[sii];
-        ParseTree hyp = Parse(sentence, sentence_pos, vocab, false, &correct);
+        ParseTree hyp = Parse(sentence, sentence_pos, vocab, false);
 
         double lp = 0;
         llh -= lp;
@@ -562,13 +561,15 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
         correct_heads += ComputeCorrect(ref, hyp);
         total_heads += sentence.size() - 1; // -1 to account for ROOT
       }
+
       auto t_end = chrono::high_resolution_clock::now();
+      auto ms = chrono::duration<double, milli>(t_end - t_start).count();
       cerr << "  **dev (iter=" << iter << " epoch="
-           << (tot_seen / num_sentences) << ")\tllh=" << llh << " ppl: "
-           << exp(llh / trs) << " err: " << (trs - correct) / trs << " uas: "
-           << (correct_heads / total_heads) << "\t[" << dev_size << " sents in "
-           << chrono::duration<double, milli>(t_end - t_start).count() << " ms]"
-           << endl;
+           << (tot_seen / num_sentences) << ")\tllh=" << llh
+           << " ppl: " << exp(llh / trs)
+           << " uas: " << (correct_heads / total_heads)
+           << "\t[" << dev_size << " sents in " << ms << " ms]" << endl;
+
       if (correct_heads > best_correct_heads) {
         best_correct_heads = correct_heads;
         SaveModel(model_fname, softlink_created);
@@ -583,7 +584,7 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
 vector<unsigned> LSTMParser::LogProbParser(
     const map<unsigned, unsigned>& sentence,
     const map<unsigned, unsigned>& sentence_pos, const CorpusVocabulary& vocab,
-    ComputationGraph *cg, double* correct, Expression* final_parser_state) {
+    ComputationGraph *cg, Expression* final_parser_state) {
   map<unsigned, unsigned> tsentence(sentence); // sentence with OOVs replaced
   for (auto& index_and_id : tsentence) { // use reference to overwrite
     if (!vocab.int_to_training_word[index_and_id.second]) {
@@ -592,17 +593,15 @@ vector<unsigned> LSTMParser::LogProbParser(
   }
   return LogProbParser(cg, sentence, tsentence, sentence_pos,
                        vector<unsigned>(), vocab.actions,
-                       vocab.int_to_words, correct, final_parser_state);
+                       vocab.int_to_words, nullptr, final_parser_state);
 }
 
 
 ParseTree LSTMParser::Parse(const map<unsigned, unsigned>& sentence,
-                const map<unsigned, unsigned>& sentence_pos,
-                const CorpusVocabulary& vocab,
-                bool labeled, double* correct) {
+                            const map<unsigned, unsigned>& sentence_pos,
+                            const CorpusVocabulary& vocab, bool labeled) {
   ComputationGraph cg;
-  vector<unsigned> pred = LogProbParser(sentence, sentence_pos, vocab, &cg,
-                                        correct);
+  vector<unsigned> pred = LogProbParser(sentence, sentence_pos, vocab, &cg);
   return RecoverParseTree(sentence, pred, vocab.actions,
                           vocab.actions_to_arc_labels, labeled);
 }
@@ -616,7 +615,6 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
   }
   double llh = 0;
   double trs = 0;
-  double correct = 0;
   double correct_heads = 0;
   double total_heads = 0;
   auto t_start = chrono::high_resolution_clock::now();
@@ -626,7 +624,7 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
     const map<unsigned, unsigned>& sentence_pos = corpus.sentences_pos[sii];
     const map<unsigned, string>& sentence_unk_str =
         corpus.sentences_unk_surface_forms[sii];
-    ParseTree hyp = Parse(sentence, sentence_pos, vocab, true, &correct);
+    ParseTree hyp = Parse(sentence, sentence_pos, vocab, true);
     if (output_parses) {
       OutputConll(sentence, sentence_pos, sentence_unk_str,
                   corpus.vocab->int_to_words, corpus.vocab->int_to_pos,
@@ -651,8 +649,8 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
   }
   auto t_end = chrono::high_resolution_clock::now();
   if (evaluate) {
-    cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: "
-         << (trs - correct) / trs << " uas: " << (correct_heads / total_heads)
+    cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs)
+         << " uas: " << (correct_heads / total_heads)
          << "\t[" << corpus_size << " sents in "
          << chrono::duration<double, milli>(t_end - t_start).count() << " ms]"
          << endl;

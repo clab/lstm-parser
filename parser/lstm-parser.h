@@ -229,7 +229,7 @@ protected:
       cnn::ComputationGraph* hg,
       const std::map<unsigned, unsigned>& raw_sent,  // raw sentence
       const std::map<unsigned, unsigned>& sent,  // sentence with OOVs replaced
-      const std::map<unsigned, unsigned>& sentPos,
+      const std::map<unsigned, unsigned>& sent_pos,
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& int_to_words, double* correct,

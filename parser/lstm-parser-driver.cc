@@ -54,7 +54,7 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   po::options_description dcmdline_options;
   dcmdline_options.add(opts);
   po::store(parse_command_line(argc, argv, dcmdline_options), *conf);
-  if (conf->count("help")) {
+  if (conf->count("help") || argc == 1) {
     cerr << dcmdline_options << endl;
     exit(0);
   }

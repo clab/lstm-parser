@@ -70,10 +70,10 @@ class ParseTree {
 public:
   static std::string NO_LABEL;
   // Barebones representation of a parse tree.
-  const std::map<unsigned, unsigned>& sentence;
+  const Sentence& sentence;
   double logprob;
 
-  ParseTree(const std::map<unsigned, unsigned>& sentence, bool labeled = true) :
+  ParseTree(const Sentence& sentence, bool labeled = true) :
       sentence(sentence),
       logprob(0),
       arc_labels( labeled ? new std::map<unsigned, std::string> : nullptr) {}
@@ -180,13 +180,12 @@ public:
   static bool IsActionForbidden(const std::string& a, unsigned bsize,
                                 unsigned ssize, const std::vector<int>& stacki);
 
-  ParseTree Parse(const std::map<unsigned, unsigned>& sentence,
-                  const std::map<unsigned, unsigned>& sentence_pos,
+  ParseTree Parse(const Sentence& sentence,
                   const CorpusVocabulary& vocab, bool labeled);
 
   // take a vector of actions and return a parse tree
   ParseTree RecoverParseTree(
-      const std::map<unsigned, unsigned>& sentence,
+      const Sentence& sentence,
       const std::vector<unsigned>& actions,
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& actions_to_arc_labels, double logprob = 0,
@@ -207,9 +206,8 @@ public:
 
   // Used for testing. Replaces OOV with UNK.
   std::vector<unsigned> LogProbParser(
-      const std::map<unsigned, unsigned>& sentence,
-      const std::map<unsigned, unsigned>& sentence_pos,
-      const CorpusVocabulary& vocab, cnn::ComputationGraph *cg,
+      const Sentence& sentence, const CorpusVocabulary& vocab,
+      cnn::ComputationGraph *cg,
       cnn::expr::Expression* final_parser_state = nullptr);
 
   void LoadPretrainedWords(const std::string& words_path);
@@ -226,9 +224,8 @@ protected:
   // OOV in the parser training data.
   std::vector<unsigned> LogProbParser(
       cnn::ComputationGraph* hg,
-      const std::map<unsigned, unsigned>& raw_sent,  // raw sentence
-      const std::map<unsigned, unsigned>& sent,  // sentence with OOVs replaced
-      const std::map<unsigned, unsigned>& sent_pos,
+      const Sentence& sentence, // raw sentence
+      const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& int_to_words, double* correct,
@@ -238,9 +235,9 @@ protected:
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {
-    assert(ref.sentence.size() == hyp.sentence.size());
+    assert(ref.sentence.Size() == hyp.sentence.Size());
     unsigned correct_count = 0;
-    for (const auto& token_index_and_word : ref.sentence) {
+    for (const auto& token_index_and_word : ref.sentence.words) {
       unsigned i = token_index_and_word.first;
       if (i != Corpus::ROOT_TOKEN_ID && ref.GetParent(i) == hyp.GetParent(i))
         ++correct_count;
@@ -287,9 +284,7 @@ private:
 
   void DoTest(const Corpus& corpus, bool evaluate, bool output_parses);
 
-  static void OutputConll(const std::map<unsigned, unsigned>& sentence,
-      const std::map<unsigned, unsigned>& pos,
-      const std::map<unsigned, std::string>& sentence_unk_strings,
+  static void OutputConll(const Sentence& sentence,
       const std::vector<std::string>& int_to_words,
       const std::vector<std::string>& int_to_pos,
       const std::map<std::string, unsigned>& words_to_int,

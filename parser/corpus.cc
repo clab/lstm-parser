@@ -27,9 +27,10 @@ const string ORACLE_ROOT_POS = "ROOT";
 void ConllUCorpusReader::ReadSentences(const string& file,
                                        Corpus* corpus) const {
   string next_line;
-  Corpus::SentenceUnkMap current_sentence_unk_surface_forms;
-  Corpus::SentenceMap current_sentence;
-  Corpus::SentenceMap current_sentence_pos;
+  // TODO: Replace this code with simpler Sentence-based code.
+  Sentence::SentenceUnkMap current_sentence_unk_surface_forms;
+  Sentence::SentenceMap current_sentence;
+  Sentence::SentenceMap current_sentence_pos;
 
   ifstream conll_file(file);
   unsigned unk_word_symbol = corpus->vocab->GetWord(CorpusVocabulary::UNK);
@@ -43,15 +44,11 @@ void ConllUCorpusReader::ReadSentences(const string& file,
         current_sentence_pos[Corpus::ROOT_TOKEN_ID] = root_pos_symbol;
         current_sentence_unk_surface_forms[Corpus::ROOT_TOKEN_ID] = "";
 
-        corpus->sentences.push_back(move(current_sentence));
-        current_sentence.clear();
-
-        corpus->sentences_pos.push_back(move(current_sentence_pos));
-        current_sentence_pos.clear();
-
-        corpus->sentences_unk_surface_forms.push_back(
-            move(current_sentence_unk_surface_forms));
-        current_sentence_unk_surface_forms.clear();
+        corpus->sentences.push_back({});
+        corpus->sentences.back().words.swap(current_sentence);
+        corpus->sentences.back().poses.swap(current_sentence_pos);
+        corpus->sentences.back().unk_surface_forms.swap(
+            current_sentence_unk_surface_forms);
       }
       continue;
     } else if (next_line[0] == '#') {
@@ -87,7 +84,7 @@ void ParserTrainingCorpus::CountSingletons() {
   // compute the singletons in the parser's training data
   map<unsigned, unsigned> counts;
   for (const auto& sent : sentences) {
-    for (const auto& index_and_word_id : sent) {
+    for (const auto& index_and_word_id : sent.words) {
       counts[index_and_word_id.second]++;
     }
   }
@@ -100,8 +97,9 @@ void ParserTrainingCorpus::CountSingletons() {
 
 void TrainingCorpus::OracleTransitionsCorpusReader::RecordWord(
     const string& word, const string& pos, unsigned next_token_index,
-    TrainingCorpus* corpus, SentenceMap* sentence, SentenceMap* sentence_pos,
-    SentenceUnkMap* sentence_unk_surface_forms) const {
+    TrainingCorpus* corpus, Sentence::SentenceMap* sentence,
+    Sentence::SentenceMap* sentence_pos,
+    Sentence::SentenceUnkMap* sentence_unk_surface_forms) const {
   // We assume that we'll have seen all POS tags in training, so don't
   // worry about OOV tags.
   CorpusVocabulary* vocab = corpus->vocab;
@@ -176,18 +174,18 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
 
 
 void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
-    TrainingCorpus* corpus, SentenceMap* sentence, SentenceMap* sentence_pos,
-    SentenceUnkMap* sentence_unk_surface_forms, bool final) const {
+    TrainingCorpus* corpus, Sentence::SentenceMap* words,
+    Sentence::SentenceMap* sentence_pos,
+    Sentence::SentenceUnkMap* sentence_unk_surface_forms, bool final) const {
   // Store the sentence variables and clear them for the next sentence.
   corpus->sentences.push_back({});
-  corpus->sentences.back().swap(*sentence);
-  corpus->sentences_pos.push_back({});
-  corpus->sentences_pos.back().swap(*sentence_pos);
+  Sentence* sentence = &corpus->sentences.back();
+  sentence->words.swap(*words);
+  sentence->poses.swap(*sentence_pos);
   if (!is_training) {
-    corpus->sentences_unk_surface_forms.push_back({});
-    corpus->sentences_unk_surface_forms.back().swap(
-        *sentence_unk_surface_forms);
+    sentence->unk_surface_forms.swap(*sentence_unk_surface_forms);
   }
+
   if (!final) {
     corpus->correct_act_sent.push_back({});
   }
@@ -206,9 +204,10 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
   bool start_of_sentence = false;
   bool first = true;
 
-  SentenceMap sentence;
-  SentenceMap sentence_pos;
-  SentenceUnkMap sentence_unk_surface_forms;
+  // TODO: replace this code with simpler Sentence-based code.
+  Sentence::SentenceMap sentence;
+  Sentence::SentenceMap sentence_pos;
+  Sentence::SentenceUnkMap sentence_unk_surface_forms;
   corpus->correct_act_sent.push_back({});
 
   // We'll need to make sure ROOT token has a consistent ID.

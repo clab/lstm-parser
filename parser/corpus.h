@@ -195,18 +195,27 @@ public:
 };
 
 
+struct Sentence {
+  typedef std::map<unsigned, unsigned> SentenceMap;
+  typedef std::map<unsigned, std::string> SentenceUnkMap;
+
+  SentenceMap words;
+  SentenceMap poses;
+  SentenceUnkMap unk_surface_forms;
+
+  size_t Size() const {
+    return words.size();
+  }
+};
+
+
 class Corpus {
 public:
   // Store root tokens with unsigned ID -1 internally to make root come last
   // when iterating over a list of tokens in order of IDs.
   static constexpr unsigned ROOT_TOKEN_ID = -1;
 
-  typedef std::map<unsigned, unsigned> SentenceMap;
-  typedef std::map<unsigned, std::string> SentenceUnkMap;
-
-  std::vector<SentenceMap> sentences;
-  std::vector<SentenceMap> sentences_pos;
-  std::vector<SentenceUnkMap> sentences_unk_surface_forms;
+  std::vector<Sentence> sentences;
   CorpusVocabulary* vocab;
 
   Corpus(CorpusVocabulary* vocab, const CorpusReader& reader,
@@ -250,15 +259,15 @@ protected:
     void RecordWord(
         const std::string& word, const std::string& pos,
         unsigned next_token_index, TrainingCorpus* corpus,
-        std::map<unsigned, unsigned>* sentence,
-        std::map<unsigned, unsigned>* sentence_pos,
-        std::map<unsigned, std::string>* sentence_unk_surface_forms) const;
+        Sentence::SentenceMap* sentence,
+        Sentence::SentenceMap* sentence_pos,
+        Sentence::SentenceUnkMap* sentence_unk_surface_forms) const;
 
     void RecordAction(const std::string& action, TrainingCorpus* corpus) const;
 
-    void RecordSentence(TrainingCorpus* corpus, SentenceMap* sentence,
-                        SentenceMap* sentence_pos,
-                        SentenceUnkMap* sentence_unk_surface_forms,
+    void RecordSentence(TrainingCorpus* corpus, Sentence::SentenceMap* words,
+                        Sentence::SentenceMap* sentence_pos,
+                        Sentence::SentenceUnkMap* sentence_unk_surface_forms,
                         bool final = false) const;
 
     static inline unsigned UTF8Len(unsigned char x) {

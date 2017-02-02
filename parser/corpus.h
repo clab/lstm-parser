@@ -201,9 +201,12 @@ public:
   // when iterating over a list of tokens in order of IDs.
   static constexpr unsigned ROOT_TOKEN_ID = -1;
 
-  std::vector<std::map<unsigned, unsigned>> sentences;
-  std::vector<std::map<unsigned, unsigned>> sentences_pos;
-  std::vector<std::map<unsigned, std::string>> sentences_unk_surface_forms;
+  typedef std::map<unsigned, unsigned> SentenceMap;
+  typedef std::map<unsigned, std::string> SentenceUnkMap;
+
+  std::vector<SentenceMap> sentences;
+  std::vector<SentenceMap> sentences_pos;
+  std::vector<SentenceUnkMap> sentences_unk_surface_forms;
   CorpusVocabulary* vocab;
 
   Corpus(CorpusVocabulary* vocab, const CorpusReader& reader,
@@ -253,11 +256,10 @@ protected:
 
     void RecordAction(const std::string& action, TrainingCorpus* corpus) const;
 
-    void RecordSentence(
-        TrainingCorpus* corpus, std::map<unsigned, unsigned>* sentence,
-        std::map<unsigned, unsigned>* sentence_pos,
-        std::map<unsigned, std::string>* sentence_unk_surface_forms,
-        bool final = false) const;
+    void RecordSentence(TrainingCorpus* corpus, SentenceMap* sentence,
+                        SentenceMap* sentence_pos,
+                        SentenceUnkMap* sentence_unk_surface_forms,
+                        bool final = false) const;
 
     static inline unsigned UTF8Len(unsigned char x) {
       if (x < 0x80) return 1;

@@ -280,12 +280,12 @@ vector<unsigned> LSTMParser::LogProbParser(
 
     vector<Expression> args = {ib, w2l, w}; // learn embeddings
     if (options.use_pos) { // learn POS tag?
-      unsigned pos_id = raw_sent.poses.find(token_index)->second;
+      unsigned pos_id = raw_sent.poses.at(token_index);
       Expression p = lookup(*hg, p_p, pos_id);
       args.push_back(p2l);
       args.push_back(p);
     }
-    unsigned raw_word_id = raw_sent.words.find(token_index)->second;
+    unsigned raw_word_id = raw_sent.words.at(token_index);
     if (p_t && pretrained.count(raw_word_id)) { // include pretrained vectors?
       Expression t = const_lookup(*hg, p_t, raw_word_id);
       args.push_back(t2l);
@@ -662,8 +662,7 @@ void LSTMParser::OutputConll(const Sentence& sentence,
                              const vector<string>& int_to_pos,
                              const map<string, unsigned>& words_to_int,
                              const ParseTree& tree) {
-  const unsigned int unk_word =
-      words_to_int.find(CorpusVocabulary::UNK)->second;
+  const unsigned int unk_word = words_to_int.at(CorpusVocabulary::UNK);
   for (const auto& token_index_and_word : sentence.words) {
     unsigned token_index = token_index_and_word.first;
     unsigned word_id = token_index_and_word.second;
@@ -677,8 +676,7 @@ void LSTMParser::OutputConll(const Sentence& sentence,
              int_to_words.size() > word_id)));
     string wit = (unk_strs_iter->second.size() > 0) ?
                   unk_strs_iter->second : int_to_words[word_id];
-    const string& pos_tag = int_to_pos[
-        sentence.poses.find(token_index)->second];
+    const string& pos_tag = int_to_pos[sentence.poses.at(token_index)];
     unsigned parent = tree.GetParent(token_index);
     if (parent == Corpus::ROOT_TOKEN_ID)
       parent = 0;

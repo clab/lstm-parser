@@ -1032,7 +1032,7 @@ int main(int argc, char** argv) {
            tot_seen += 1;
            const vector<unsigned>& sentence=corpus.sentences[order[si]];
            vector<unsigned> tsentence=sentence;
-           if (unk_strategy == 1) {
+           if (unk_strategy == 1 && !USE_SPELLING) {
              for (auto& w : tsentence)
                if (singletons.count(w) && cnn::rand01() < unk_prob) w = kUNK;
            }

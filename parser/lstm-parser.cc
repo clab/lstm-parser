@@ -578,7 +578,6 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
 }
 
 
-// TODO: fix this so that correct actually does something sometimes
 vector<unsigned> LSTMParser::LogProbParser(
     const Sentence& sentence, const CorpusVocabulary& vocab,
     ComputationGraph *cg, Expression* final_parser_state) {

@@ -113,12 +113,9 @@ private:
 };
 
 
-class LSTMParser : LSTMTransitionTagger {
+class LSTMParser : public LSTMTransitionTagger {
 public:
-  // TODO: make some of these members non-public
   ParserOptions options;
-  CorpusVocabulary vocab;
-  cnn::Model model;
 
   std::unordered_map<unsigned, std::vector<float>> pretrained;
   unsigned n_possible_actions;
@@ -179,16 +176,6 @@ public:
     *archive >> *this;
   }
 
-  virtual bool IsActionForbidden(const std::string& a,
-                                 const TaggerState& state) override;
-
-  virtual cnn::expr::Expression GetActionProbabilities(const TaggerState& state)
-      override;
-
-  virtual void DoAction(unsigned action,
-                        const std::vector<std::string>& action_names,
-                        TaggerState* state, cnn::ComputationGraph* cg) override;
-
   ParseTree Parse(const Sentence& sentence,
                   const CorpusVocabulary& vocab, bool labeled);
 
@@ -214,8 +201,6 @@ public:
   }
 
   void LoadPretrainedWords(const std::string& words_path);
-
-  void FinalizeVocab();
 
 protected:
   struct ParserState : public TaggerState {
@@ -248,10 +233,22 @@ protected:
       const std::vector<unsigned>& correct_actions,
       const std::vector<std::string>& action_names) override;
 
-  virtual bool ShouldTerminate(const TaggerState& state) override {
+  virtual void InitializeNetworkParameters() override;
+
+  virtual bool ShouldTerminate(const TaggerState& state) const override {
     const ParserState& real_state = static_cast<const ParserState&>(state);
     return real_state.stack.size() <= 2 && real_state.buffer.size() <= 1;
   }
+
+  virtual bool IsActionForbidden(const std::string& a,
+                                 const TaggerState& state) const override;
+
+  virtual cnn::expr::Expression GetActionProbabilities(const TaggerState& state)
+      override;
+
+  virtual void DoAction(unsigned action,
+                        const std::vector<std::string>& action_names,
+                        TaggerState* state, cnn::ComputationGraph* cg) override;
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {

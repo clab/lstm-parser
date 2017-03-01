@@ -64,10 +64,7 @@ void LSTMParser::LoadPretrainedWords(const string& words_path) {
 }
 
 
-void LSTMParser::FinalizeVocab() {
-  if (finalized)
-    return;
-
+void LSTMParser::InitializeNetworkParameters() {
   // Now that the vocab is ready to be finalized, we can set all the network
   // parameters.
   unsigned action_size = vocab.CountActions() + 1;
@@ -112,8 +109,6 @@ void LSTMParser::FinalizeVocab() {
     p_p = nullptr;
     p_p2l = nullptr;
   }
-
-  finalized = true;
 }
 
 
@@ -141,7 +136,8 @@ LSTMParser::LSTMParser(const ParserOptions& poptions,
 }
 
 
-bool LSTMParser::IsActionForbidden(const string& a, const TaggerState& state) {
+bool LSTMParser::IsActionForbidden(const string& a,
+                                   const TaggerState& state) const {
   const ParserState& real_state = static_cast<const ParserState&>(state);
   unsigned ssize = real_state.stack.size();
   unsigned bsize = real_state.buffer.size();

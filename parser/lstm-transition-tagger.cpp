@@ -35,6 +35,14 @@ void LSTMTransitionTagger::SaveModel(const string& model_fname,
 }
 
 
+void LSTMTransitionTagger::FinalizeVocab() {
+  if (finalized)
+    return;
+  InitializeNetworkParameters();
+  finalized = true;
+}
+
+
 vector<unsigned> LSTMTransitionTagger::LogProbTagger(
     const Sentence& sentence, const CorpusVocabulary& vocab,
     ComputationGraph *cg, Expression* final_parser_state) {

@@ -17,14 +17,24 @@ namespace lstm_parser {
 
 class LSTMTransitionTagger {
 public:
+  // TODO: this really shouldn't be public...
+  CorpusVocabulary vocab;
+
   LSTMTransitionTagger() : finalized(false) {}
   virtual ~LSTMTransitionTagger() {}
+
+  void FinalizeVocab();
 
 protected:
   struct TaggerState {};
 
   bool finalized;
   std::map<cnn::ParametersBase*, cnn::expr::Expression> param_expressions;
+
+  cnn::Model model;
+
+  LSTMTransitionTagger(const CorpusVocabulary& vocab)
+      : vocab(vocab), finalized(false) {}
 
   inline cnn::expr::Expression GetParamExpr(cnn::ParametersBase* params) {
     return param_expressions.at(params);
@@ -41,16 +51,18 @@ protected:
   virtual cnn::expr::Expression GetActionProbabilities(
       const TaggerState& state) = 0;
 
-  virtual bool ShouldTerminate(const TaggerState& state) = 0;
+  virtual bool ShouldTerminate(const TaggerState& state) const = 0;
 
   virtual bool IsActionForbidden(const std::string& action_name,
-                                 const TaggerState& state) = 0;
+                                 const TaggerState& state) const = 0;
 
   virtual void DoAction(unsigned action,
                         const std::vector<std::string>& action_names,
                         TaggerState* state, cnn::ComputationGraph* cg) = 0;
 
   virtual void DoSave(eos::portable_oarchive& archive) = 0;
+
+  virtual void InitializeNetworkParameters() = 0;
 
   void SaveModel(const std::string& model_fname, bool softlink_created);
 
@@ -61,12 +73,11 @@ protected:
       cnn::expr::Expression* final_parser_state = nullptr);
 
   // *** if correct_actions is empty, this runs greedy decoding ***
-  // returns parse actions for input sentence (in training just returns the
-  // reference)
+  // returns actions for input sentence (in training just returns the reference)
   // OOV handling: raw_sent will have the actual words
   //               sent will have words replaced by appropriate UNK tokens
   // this lets us use pretrained embeddings, when available, for words that were
-  // OOV in the parser training data.
+  // OOV in the training data.
   std::vector<unsigned> LogProbTagger(
       cnn::ComputationGraph* hg,
       const Sentence& sentence, // raw sentence

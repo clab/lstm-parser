@@ -120,11 +120,6 @@ int main(int argc, char** argv) {
     abort();
   }
   if (train && !load_model) {
-    if (!conf.count("words")) {
-      cerr << "Can't train without word vectors! Please provide --words."
-           << endl;
-      abort();
-    }
     if (!conf.count("training_data")) {
       cerr << "Can't train without training data! Please provide"
               " --training_data" << endl;
@@ -132,7 +127,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  const string words = load_model ? "" : conf["words"].as<string>();
+  const string words =
+      load_model || !conf.count("words") ? "" : conf["words"].as<string>();
   unique_ptr<LSTMParser> parser;
   if (load_model) {
     parser.reset(new LSTMParser(conf["model"].as<string>()));

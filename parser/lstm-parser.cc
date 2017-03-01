@@ -14,7 +14,6 @@
 
 #include "cnn/model.h"
 #include "cnn/tensor.h"
-#include "eos/portable_archive.hpp"
 
 
 using namespace cnn::expr;
@@ -121,7 +120,6 @@ void LSTMParser::FinalizeVocab() {
 LSTMParser::LSTMParser(const ParserOptions& poptions,
                        const string& pretrained_words_path, bool finalize) :
       options(poptions),
-      kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)),
       stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
                  &model),
@@ -143,13 +141,16 @@ LSTMParser::LSTMParser(const ParserOptions& poptions,
 }
 
 
-bool LSTMParser::IsActionForbidden(const string& a, unsigned bsize,
-                                   unsigned ssize, const vector<int>& stacki) {
+bool LSTMParser::IsActionForbidden(const string& a, const TaggerState& state) {
+  const ParserState& real_state = static_cast<const ParserState&>(state);
+  unsigned ssize = real_state.stack.size();
+  unsigned bsize = real_state.buffer.size();
+
   if (a[1] == 'W' && ssize < 3)
     return true;
   if (a[1] == 'W') {
-    int top = stacki[stacki.size() - 1];
-    int sec = stacki[stacki.size() - 2];
+    int top = real_state.stacki[real_state.stacki.size() - 1];
+    int sec = real_state.stacki[real_state.stacki.size() - 2];
     if (sec > top)
       return true;
   }
@@ -224,234 +225,156 @@ ParseTree LSTMParser::RecoverParseTree(
 }
 
 
-vector<unsigned> LSTMParser::LogProbParser(
-    ComputationGraph* hg,
-    const Sentence& raw_sent,  // raw sentence
-    const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-    const vector<unsigned>& correct_actions, const vector<string>& action_names,
-    const vector<string>& int_to_words, double* correct,
-    Expression* final_parser_state) {
-  // TODO: break up this function?
-  assert(finalized);
-  vector<unsigned> results;
-  const bool build_training_graph = correct_actions.size() > 0;
+cnn::expr::Expression LSTMParser::GetActionProbabilities(
+      const TaggerState& state) {
+  // p_t = pbias + S * slstm + B * blstm + A * alstm
+  Expression p_t = affine_transform(
+      {GetParamExpr(p_pbias), GetParamExpr(p_S), stack_lstm.back(),
+          GetParamExpr(p_B), buffer_lstm.back(), GetParamExpr(p_A),
+          action_lstm.back()});
+  Expression nlp_t = rectify(p_t);
+  // r_t = abias + p2a * nlp
+  Expression r_t = affine_transform(
+      {GetParamExpr(p_abias), GetParamExpr(p_p2a), nlp_t});
+  return r_t;
+}
 
-  stack_lstm.new_graph(*hg);
-  buffer_lstm.new_graph(*hg);
-  action_lstm.new_graph(*hg);
+
+void LSTMParser::DoAction(unsigned action,
+                          const vector<string>& action_names,
+                          TaggerState* state, ComputationGraph* cg) {
+  ParserState* real_state = static_cast<ParserState*>(state);
+  // add current action to action LSTM
+  Expression action_e = lookup(*cg, p_a, action);
+  action_lstm.add_input(action_e);
+
+  // get relation embedding from action (TODO: convert to rel from action?)
+  Expression relation = lookup(*cg, p_r, action);
+
+  // do action
+  const string& action_string = action_names[action];
+  const char ac = action_string[0];
+  const char ac2 = action_string[1];
+
+  if (ac == 'S' && ac2 == 'H') {  // SHIFT
+    assert(real_state->buffer.size() > 1); // dummy symbol means > 1 (not >= 1)
+    real_state->stack.push_back(real_state->buffer.back());
+    stack_lstm.add_input(real_state->buffer.back());
+    real_state->buffer.pop_back();
+    buffer_lstm.rewind_one_step();
+    real_state->stacki.push_back(real_state->bufferi.back());
+    real_state->bufferi.pop_back();
+  } else if (ac == 'S' && ac2 == 'W') { //SWAP --- Miguel
+    assert(real_state->stack.size() > 2); // dummy symbol means > 2 (not >= 2)
+
+    Expression toki, tokj;
+    unsigned ii = 0, jj = 0;
+    tokj = real_state->stack.back();
+    jj = real_state->stacki.back();
+    real_state->stack.pop_back();
+    real_state->stacki.pop_back();
+
+    toki = real_state->stack.back();
+    ii = real_state->stacki.back();
+    real_state->stack.pop_back();
+    real_state->stacki.pop_back();
+
+    real_state->buffer.push_back(toki);
+    real_state->bufferi.push_back(ii);
+
+    stack_lstm.rewind_one_step();
+    stack_lstm.rewind_one_step();
+
+    buffer_lstm.add_input(real_state->buffer.back());
+
+    real_state->stack.push_back(tokj);
+    real_state->stacki.push_back(jj);
+
+    stack_lstm.add_input(real_state->stack.back());
+  } else { // LEFT or RIGHT
+    assert(real_state->stack.size() > 2); // dummy symbol means > 2 (not >= 2)
+    assert(ac == 'L' || ac == 'R');
+    Expression dep, head;
+    unsigned depi = 0, headi = 0;
+    (ac == 'R' ? dep : head) = real_state->stack.back();
+    (ac == 'R' ? depi : headi) = real_state->stacki.back();
+    real_state->stack.pop_back();
+    real_state->stacki.pop_back();
+    (ac == 'R' ? head : dep) = real_state->stack.back();
+    (ac == 'R' ? headi : depi) = real_state->stacki.back();
+    real_state->stack.pop_back();
+    real_state->stacki.pop_back();
+    // composed = cbias + H * head + D * dep + R * relation
+    Expression composed = affine_transform({GetParamExpr(p_cbias),
+        GetParamExpr(p_H), head, GetParamExpr(p_D), dep, GetParamExpr(p_R),
+        relation});
+    Expression nlcomposed = tanh(composed);
+    stack_lstm.rewind_one_step();
+    stack_lstm.rewind_one_step();
+    stack_lstm.add_input(nlcomposed);
+    real_state->stack.push_back(nlcomposed);
+    real_state->stacki.push_back(headi);
+  }
+}
+
+
+LSTMTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
+    cnn::ComputationGraph* cg,
+    const Sentence& raw_sent,
+    const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
+    const std::vector<unsigned>& correct_actions,
+    const std::vector<std::string>& action_names) {
+  stack_lstm.new_graph(*cg);
+  buffer_lstm.new_graph(*cg);
+  action_lstm.new_graph(*cg);
   stack_lstm.start_new_sequence();
   buffer_lstm.start_new_sequence();
   action_lstm.start_new_sequence();
-  // variables in the computation graph representing the parameters
-  Expression pbias = parameter(*hg, p_pbias);
-  Expression H = parameter(*hg, p_H);
-  Expression D = parameter(*hg, p_D);
-  Expression R = parameter(*hg, p_R);
-  Expression cbias = parameter(*hg, p_cbias);
-  Expression S = parameter(*hg, p_S);
-  Expression B = parameter(*hg, p_B);
-  Expression A = parameter(*hg, p_A);
-  Expression ib = parameter(*hg, p_ib);
-  Expression w2l = parameter(*hg, p_w2l);
-  Expression p2l;
-  if (options.use_pos)
-    p2l = parameter(*hg, p_p2l);
-  Expression t2l;
-  if (p_t2l)
-    t2l = parameter(*hg, p_t2l);
-  Expression p2a = parameter(*hg, p_p2a);
-  Expression abias = parameter(*hg, p_abias);
-  Expression action_start = parameter(*hg, p_action_start);
 
-  action_lstm.add_input(action_start);
+  action_lstm.add_input(GetParamExpr(p_action_start));
 
-  // variables representing word embeddings (possibly including POS info)
-  vector<Expression> buffer(sent.size() + 1);
-  vector<int> bufferi(sent.size() + 1); // position of the words in the sentence
+  ParserState* state = new ParserState;
+  state->buffer.resize(raw_sent.Size() + 1);
+  state->bufferi.resize(raw_sent.Size() + 1);
+  state->stack.push_back(parameter(*cg, p_stack_guard));
+  state->stacki.push_back(-999);
+  // drive dummy symbol on stack through LSTM
+  stack_lstm.add_input(state->stack.back());
+
   // precompute buffer representation from left to right
-
   unsigned added_to_buffer = 0;
   for (const auto& index_and_word_id : sent) {
     unsigned token_index = index_and_word_id.first;
     unsigned word_id = index_and_word_id.second;
 
     assert(word_id < vocab.CountWords());
-    Expression w = lookup(*hg, p_w, word_id);
+    Expression w = lookup(*cg, p_w, word_id);
 
-    vector<Expression> args = {ib, w2l, w}; // learn embeddings
-    if (options.use_pos) { // learn POS tag?
+    vector<Expression> args = {GetParamExpr(p_ib), GetParamExpr(p_w2l),
+                               w};  // learn embeddings
+    if (options.use_pos) {  // learn POS tag?
       unsigned pos_id = raw_sent.poses.at(token_index);
-      Expression p = lookup(*hg, p_p, pos_id);
-      args.push_back(p2l);
+      Expression p = lookup(*cg, p_p, pos_id);
+      args.push_back(GetParamExpr(p_p2l));
       args.push_back(p);
     }
     unsigned raw_word_id = raw_sent.words.at(token_index);
-    if (p_t && pretrained.count(raw_word_id)) { // include pretrained vectors?
-      Expression t = const_lookup(*hg, p_t, raw_word_id);
-      args.push_back(t2l);
+    if (p_t && pretrained.count(raw_word_id)) {  // include pretrained vectors?
+      Expression t = const_lookup(*cg, p_t, raw_word_id);
+      args.push_back(GetParamExpr(p_t2l));
       args.push_back(t);
     }
-    buffer[sent.size() - added_to_buffer] = rectify(affine_transform(args));
-    bufferi[sent.size() - added_to_buffer] = token_index;
+    state->buffer[sent.size() - added_to_buffer] = rectify(affine_transform(args));
+    state->bufferi[sent.size() - added_to_buffer] = token_index;
     added_to_buffer++;
   }
   // dummy symbol to represent the empty buffer
-  buffer[0] = parameter(*hg, p_buffer_guard);
-  bufferi[0] = -999;
-  for (auto& b : buffer)
+  state->buffer[0] = parameter(*cg, p_buffer_guard);
+  state->bufferi[0] = -999;
+  for (auto& b : state->buffer)
     buffer_lstm.add_input(b);
 
-  vector<Expression> stack;  // variables representing subtree embeddings
-  vector<int> stacki; // position of words in the sentence of head of subtree
-  stack.push_back(parameter(*hg, p_stack_guard));
-  stacki.push_back(-999); // not used for anything
-  // drive dummy symbol on stack through LSTM
-  stack_lstm.add_input(stack.back());
-  vector<Expression> log_probs;
-  unsigned action_count = 0;  // incremented at each prediction
-  Expression p_t; // declared outside to allow access later
-  while (stack.size() > 2 || buffer.size() > 1) {
-    // get list of possible actions for the current parser state
-    vector<unsigned> current_valid_actions;
-    for (unsigned action = 0; action < n_possible_actions; ++action) {
-      if (IsActionForbidden(action_names[action], buffer.size(), stack.size(),
-                            stacki))
-        continue;
-      current_valid_actions.push_back(action);
-    }
-
-    // p_t = pbias + S * slstm + B * blstm + A * almst
-    p_t = affine_transform(
-        {pbias, S, stack_lstm.back(), B, buffer_lstm.back(), A,
-         action_lstm.back()});
-    Expression nlp_t = rectify(p_t);
-    // r_t = abias + p2a * nlp
-    Expression r_t = affine_transform({abias, p2a, nlp_t});
-
-    // adist = log_softmax(r_t, current_valid_actions)
-    Expression adiste = log_softmax(r_t, current_valid_actions);
-    vector<float> adist = as_vector(hg->incremental_forward());
-    double best_score = adist[current_valid_actions[0]];
-    unsigned best_a = current_valid_actions[0];
-    for (unsigned i = 1; i < current_valid_actions.size(); ++i) {
-      if (adist[current_valid_actions[i]] > best_score) {
-        best_score = adist[current_valid_actions[i]];
-        best_a = current_valid_actions[i];
-      }
-    }
-    unsigned action = best_a;
-    // If we have reference actions (for training), use the reference action.
-    if (build_training_graph) {
-      action = correct_actions[action_count];
-      if (correct && best_a == action) {
-        (*correct)++;
-      }
-    }
-    ++action_count;
-    log_probs.push_back(pick(adiste, action));
-    results.push_back(action);
-
-    // add current action to action LSTM
-    Expression action_e = lookup(*hg, p_a, action);
-    action_lstm.add_input(action_e);
-
-    // get relation embedding from action (TODO: convert to rel from action?)
-    Expression relation = lookup(*hg, p_r, action);
-
-    // do action
-    const string& action_string = action_names[action];
-    const char ac = action_string[0];
-    const char ac2 = action_string[1];
-
-    if (ac == 'S' && ac2 == 'H') {  // SHIFT
-      assert(buffer.size() > 1); // dummy symbol means > 1 (not >= 1)
-      stack.push_back(buffer.back());
-      stack_lstm.add_input(buffer.back());
-      buffer.pop_back();
-      buffer_lstm.rewind_one_step();
-      stacki.push_back(bufferi.back());
-      bufferi.pop_back();
-    } else if (ac == 'S' && ac2 == 'W') { //SWAP --- Miguel
-      assert(stack.size() > 2); // dummy symbol means > 2 (not >= 2)
-
-      Expression toki, tokj;
-      unsigned ii = 0, jj = 0;
-      tokj = stack.back();
-      jj = stacki.back();
-      stack.pop_back();
-      stacki.pop_back();
-
-      toki = stack.back();
-      ii = stacki.back();
-      stack.pop_back();
-      stacki.pop_back();
-
-      buffer.push_back(toki);
-      bufferi.push_back(ii);
-
-      stack_lstm.rewind_one_step();
-      stack_lstm.rewind_one_step();
-
-      buffer_lstm.add_input(buffer.back());
-
-      stack.push_back(tokj);
-      stacki.push_back(jj);
-
-      stack_lstm.add_input(stack.back());
-    } else { // LEFT or RIGHT
-      assert(stack.size() > 2); // dummy symbol means > 2 (not >= 2)
-      assert(ac == 'L' || ac == 'R');
-      Expression dep, head;
-      unsigned depi = 0, headi = 0;
-      (ac == 'R' ? dep : head) = stack.back();
-      (ac == 'R' ? depi : headi) = stacki.back();
-      stack.pop_back();
-      stacki.pop_back();
-      (ac == 'R' ? head : dep) = stack.back();
-      (ac == 'R' ? headi : depi) = stacki.back();
-      stack.pop_back();
-      stacki.pop_back();
-      // composed = cbias + H * head + D * dep + R * relation
-      Expression composed = affine_transform({cbias, H, head, D, dep, R,
-                                              relation});
-      Expression nlcomposed = tanh(composed);
-      stack_lstm.rewind_one_step();
-      stack_lstm.rewind_one_step();
-      stack_lstm.add_input(nlcomposed);
-      stack.push_back(nlcomposed);
-      stacki.push_back(headi);
-    }
-  }
-  assert(stack.size() == 2); // guard symbol, root
-  assert(stacki.size() == 2);
-  assert(buffer.size() == 1); // guard symbol
-  assert(bufferi.size() == 1);
-  Expression tot_neglogprob = -sum(log_probs);
-  assert(tot_neglogprob.pg != nullptr);
-
-  if (final_parser_state) {
-    *final_parser_state = p_t;
-  }
-  return results;
-}
-
-
-void LSTMParser::SaveModel(const string& model_fname, bool softlink_created) {
-  ofstream out_file(model_fname);
-  eos::portable_oarchive archive(out_file);
-  archive << *this;
-  cerr << "Model saved." << endl;
-  // Create a soft link to the most recent model in order to make it
-  // easier to refer to it in a shell script.
-  if (!softlink_created) {
-    string softlink = "latest_model.params";
-
-    if (system((string("rm -f ") + softlink).c_str()) == 0
-        && system(("ln -s " + model_fname + " " + softlink).c_str()) == 0) {
-      cerr << "Created " << softlink << " as a soft link to " << model_fname
-           << " for convenience." << endl;
-    }
-  }
+  return state;
 }
 
 
@@ -504,13 +427,13 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
         for (auto& index_and_id : tsentence) { // use reference to overwrite
           if (corpus.singletons.count(index_and_id.second)
               && cnn::rand01() < unk_prob) {
-            index_and_id.second = kUNK;
+            index_and_id.second = vocab.kUNK;
           }
         }
       }
       const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
       ComputationGraph hg;
-      LogProbParser(&hg, sentence, tsentence, actions,
+      LogProbTagger(&hg, sentence, tsentence, actions,
                     corpus.vocab->actions, corpus.vocab->int_to_words,
                     &correct);
       double lp = as_scalar(hg.incremental_forward());
@@ -578,25 +501,10 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
 }
 
 
-vector<unsigned> LSTMParser::LogProbParser(
-    const Sentence& sentence, const CorpusVocabulary& vocab,
-    ComputationGraph *cg, Expression* final_parser_state) {
-  Sentence::SentenceMap tsentence(sentence.words); // sentence w/ OOVs replaced
-  for (auto& index_and_id : tsentence) { // use reference to overwrite
-    if (!vocab.int_to_training_word[index_and_id.second]) {
-      index_and_id.second = kUNK;
-    }
-  }
-  return LogProbParser(cg, sentence, tsentence, vector<unsigned>(),
-                       vocab.actions, vocab.int_to_words, nullptr,
-                       final_parser_state);
-}
-
-
 ParseTree LSTMParser::Parse(const Sentence& sentence,
                             const CorpusVocabulary& vocab, bool labeled) {
   ComputationGraph cg;
-  vector<unsigned> pred = LogProbParser(sentence, vocab, &cg);
+  vector<unsigned> pred = LogProbTagger(sentence, vocab, &cg);
   double lp = as_scalar(cg.incremental_forward());
   return RecoverParseTree(sentence, pred, vocab.actions,
                           vocab.actions_to_arc_labels, labeled, lp);

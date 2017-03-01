@@ -20,6 +20,7 @@
 #include "cnn/rnn.h"
 #include "corpus.h"
 #include "eos/portable_archive.hpp"
+#include "lstm-transition-tagger.h"
 
 
 namespace lstm_parser {
@@ -112,17 +113,15 @@ private:
 };
 
 
-class LSTMParser {
+class LSTMParser : LSTMTransitionTagger {
 public:
   // TODO: make some of these members non-public
   ParserOptions options;
   CorpusVocabulary vocab;
   cnn::Model model;
 
-  bool finalized;
   std::unordered_map<unsigned, std::vector<float>> pretrained;
   unsigned n_possible_actions;
-  const unsigned kUNK;
   const unsigned kROOT_SYMBOL;
 
   cnn::LSTMBuilder stack_lstm; // (layers, input, hidden, trainer)
@@ -156,7 +155,6 @@ public:
                          bool finalize=true);
 
   explicit LSTMParser(const std::string& model_path) :
-      kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
     std::cerr << "Loading model from " << model_path << "...";
     auto t_start = std::chrono::high_resolution_clock::now();
@@ -176,13 +174,19 @@ public:
 
   template <class Archive>
   explicit LSTMParser(Archive* archive) :
-      kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
     *archive >> *this;
   }
 
-  static bool IsActionForbidden(const std::string& a, unsigned bsize,
-                                unsigned ssize, const std::vector<int>& stacki);
+  virtual bool IsActionForbidden(const std::string& a,
+                                 const TaggerState& state) override;
+
+  virtual cnn::expr::Expression GetActionProbabilities(const TaggerState& state)
+      override;
+
+  virtual void DoAction(unsigned action,
+                        const std::vector<std::string>& action_names,
+                        TaggerState* state, cnn::ComputationGraph* cg) override;
 
   ParseTree Parse(const Sentence& sentence,
                   const CorpusVocabulary& vocab, bool labeled);
@@ -208,34 +212,45 @@ public:
     DoTest(corpus, true, output_parses);
   }
 
-  // Used for testing. Replaces OOV with UNK.
-  std::vector<unsigned> LogProbParser(
-      const Sentence& sentence, const CorpusVocabulary& vocab,
-      cnn::ComputationGraph *cg,
-      cnn::expr::Expression* final_parser_state = nullptr);
-
   void LoadPretrainedWords(const std::string& words_path);
 
   void FinalizeVocab();
 
 protected:
-  // *** if correct_actions is empty, this runs greedy decoding ***
-  // returns parse actions for input sentence (in training just returns the
-  // reference)
-  // OOV handling: raw_sent will have the actual words
-  //               sent will have words replaced by appropriate UNK tokens
-  // this lets us use pretrained embeddings, when available, for words that were
-  // OOV in the parser training data.
-  std::vector<unsigned> LogProbParser(
-      cnn::ComputationGraph* hg,
-      const Sentence& sentence, // raw sentence
+  struct ParserState : public TaggerState {
+    std::vector<cnn::expr::Expression> buffer;
+    std::vector<int> bufferi; // position of the words in the sentence
+    std::vector<cnn::expr::Expression> stack;  // subtree embeddings
+    std::vector<int> stacki; // word position in sentence of head of subtree
+
+    ~ParserState() {
+      assert(stack.size() == 2); // guard symbol, root
+      assert(stacki.size() == 2);
+      assert(buffer.size() == 1); // guard symbol
+      assert(bufferi.size() == 1);
+    }
+  };
+
+  virtual std::vector<cnn::Parameters*> GetParameters() override {
+    std::vector<cnn::Parameters*> all_params {p_pbias, p_H, p_D, p_R, p_cbias,
+        p_S, p_B, p_A, p_ib, p_w2l, p_p2a, p_abias, p_action_start};
+    if (options.use_pos)
+      all_params.push_back(p_p2l);
+    if (p_t2l)
+      all_params.push_back(p_t2l);
+    return all_params;
+  }
+
+  virtual TaggerState* InitializeParserState(
+      cnn::ComputationGraph* cg, const Sentence& raw_sent,
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
       const std::vector<unsigned>& correct_actions,
-      const std::vector<std::string>& action_names,
-      const std::vector<std::string>& int_to_words, double* correct,
-      cnn::expr::Expression* final_parser_state = nullptr);
+      const std::vector<std::string>& action_names) override;
 
-  void SaveModel(const std::string& model_fname, bool softlink_created);
+  virtual bool ShouldTerminate(const TaggerState& state) override {
+    const ParserState& real_state = static_cast<const ParserState&>(state);
+    return real_state.stack.size() <= 2 && real_state.buffer.size() <= 1;
+  }
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {
@@ -247,6 +262,10 @@ protected:
         ++correct_count;
     }
     return correct_count;
+  }
+
+  virtual void DoSave(eos::portable_oarchive& archive) override {
+    archive << *this;
   }
 
 private:

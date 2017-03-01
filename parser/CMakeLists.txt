@@ -1,7 +1,7 @@
 PROJECT(lstm-parser:parser)
 CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 
-ADD_LIBRARY(lstm-parser-core lstm-parser.cc corpus.cc)
+ADD_LIBRARY(lstm-parser-core lstm-parser.cc corpus.cc lstm-transition-tagger.cpp)
 target_link_libraries(lstm-parser-core cnn ${Boost_LIBRARIES})
 
 ADD_EXECUTABLE(lstm-parse lstm-parser-driver.cc)

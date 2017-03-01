@@ -51,7 +51,9 @@ protected:
   virtual cnn::expr::Expression GetActionProbabilities(
       const TaggerState& state) = 0;
 
-  virtual bool ShouldTerminate(const TaggerState& state) const = 0;
+  virtual bool ShouldTerminate(const TaggerState& state,
+                               const Sentence& raw_sent,
+                               const Sentence::SentenceMap& sent) const = 0;
 
   virtual bool IsActionForbidden(const std::string& action_name,
                                  const TaggerState& state) const = 0;

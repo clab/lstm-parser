@@ -81,7 +81,7 @@ vector<unsigned> LSTMTransitionTagger::LogProbTagger(
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction
   Expression p_t; // declared outside to allow access later
-  while (!ShouldTerminate(*state)) {
+  while (!ShouldTerminate(*state, raw_sent, sent)) {
     // Get list of possible actions for the current parser state.
     vector<unsigned> current_valid_actions;
     for (unsigned action = 0; action < action_names.size(); ++action) {

@@ -235,7 +235,9 @@ protected:
 
   virtual void InitializeNetworkParameters() override;
 
-  virtual bool ShouldTerminate(const TaggerState& state) const override {
+  virtual bool ShouldTerminate(
+      const TaggerState& state, const Sentence& raw_sent,
+      const Sentence::SentenceMap& sent) const override {
     const ParserState& real_state = static_cast<const ParserState&>(state);
     return real_state.stack.size() <= 2 && real_state.buffer.size() <= 1;
   }

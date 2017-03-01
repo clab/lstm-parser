@@ -161,6 +161,10 @@ public:
     std::cerr << "Loading model from " << model_path << "...";
     auto t_start = std::chrono::high_resolution_clock::now();
     std::ifstream model_file(model_path.c_str(), std::ios::binary);
+    if (!model_file) {
+      std::cerr << "Unable to open model file; aborting" << std::endl;
+      abort();
+    }
     eos::portable_iarchive archive(model_file);
     archive >> *this;
     auto t_end = std::chrono::high_resolution_clock::now();

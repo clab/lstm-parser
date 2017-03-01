@@ -33,6 +33,11 @@ void ConllUCorpusReader::ReadSentences(const string& file,
   Sentence::SentenceMap current_sentence_pos;
 
   ifstream conll_file(file);
+  if (!conll_file) {
+    cerr << "Unable to open corpus file " << file << "; aborting" << endl;
+    abort();
+  }
+
   unsigned unk_word_symbol = corpus->vocab->GetWord(CorpusVocabulary::UNK);
   unsigned root_symbol = corpus->vocab->GetWord(CorpusVocabulary::ROOT);
   unsigned root_pos_symbol = corpus->vocab->GetPOS(CorpusVocabulary::ROOT);
@@ -197,6 +202,11 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
   cerr << "Loading " << (is_training ? "training" : "dev")
        << " corpus from " << file << "..." << endl;
   ifstream actions_file(file);
+  if (!actions_file) {
+    cerr << "Unable to open actions file " << file << "; aborting" << endl;
+    abort();
+  }
+
   string line;
   CorpusVocabulary* vocab = corpus->vocab;
 

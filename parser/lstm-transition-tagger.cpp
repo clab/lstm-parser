@@ -85,7 +85,7 @@ vector<unsigned> LSTMTransitionTagger::LogProbTagger(
     // Get list of possible actions for the current parser state.
     vector<unsigned> current_valid_actions;
     for (unsigned action = 0; action < action_names.size(); ++action) {
-      if (IsActionForbidden(action_names[action], *state))
+      if (IsActionForbidden(action, action_names, *state))
         continue;
       current_valid_actions.push_back(action);
     }

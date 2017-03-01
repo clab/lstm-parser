@@ -242,7 +242,8 @@ protected:
     return real_state.stack.size() <= 2 && real_state.buffer.size() <= 1;
   }
 
-  virtual bool IsActionForbidden(const std::string& a,
+  virtual bool IsActionForbidden(const unsigned action,
+                                 const std::vector<std::string>& action_names,
                                  const TaggerState& state) const override;
 
   virtual cnn::expr::Expression GetActionProbabilities(const TaggerState& state)

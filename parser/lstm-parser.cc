@@ -136,22 +136,24 @@ LSTMParser::LSTMParser(const ParserOptions& poptions,
 }
 
 
-bool LSTMParser::IsActionForbidden(const string& a,
+bool LSTMParser::IsActionForbidden(const unsigned action,
+                                   const vector<string>& action_names,
                                    const TaggerState& state) const {
+  const string& action_name = action_names[action];
   const ParserState& real_state = static_cast<const ParserState&>(state);
   unsigned ssize = real_state.stack.size();
   unsigned bsize = real_state.buffer.size();
 
-  if (a[1] == 'W' && ssize < 3)
+  if (action_name[1] == 'W' && ssize < 3)
     return true;
-  if (a[1] == 'W') {
+  if (action_name[1] == 'W') {
     int top = real_state.stacki[real_state.stacki.size() - 1];
     int sec = real_state.stacki[real_state.stacki.size() - 2];
     if (sec > top)
       return true;
   }
 
-  bool is_shift = (a[0] == 'S' && a[1] == 'H');
+  bool is_shift = (action_name[0] == 'S' && action_name[1] == 'H');
   bool is_reduce = !is_shift;
   if (is_shift && bsize == 1)
     return true;
@@ -162,7 +164,7 @@ bool LSTMParser::IsActionForbidden(const string& a,
       is_shift)
     return true;
   // only attach left to ROOT
-  if (bsize == 1 && ssize == 3 && a[0] == 'R')
+  if (bsize == 1 && ssize == 3 && action_name[0] == 'R')
     return true;
   return false;
 }
@@ -221,8 +223,7 @@ ParseTree LSTMParser::RecoverParseTree(
 }
 
 
-cnn::expr::Expression LSTMParser::GetActionProbabilities(
-      const TaggerState& state) {
+Expression LSTMParser::GetActionProbabilities(const TaggerState& state) {
   // p_t = pbias + S * slstm + B * blstm + A * alstm
   Expression p_t = affine_transform(
       {GetParamExpr(p_pbias), GetParamExpr(p_S), stack_lstm.back(),
@@ -236,8 +237,7 @@ cnn::expr::Expression LSTMParser::GetActionProbabilities(
 }
 
 
-void LSTMParser::DoAction(unsigned action,
-                          const vector<string>& action_names,
+void LSTMParser::DoAction(unsigned action, const vector<string>& action_names,
                           TaggerState* state, ComputationGraph* cg) {
   ParserState* real_state = static_cast<ParserState*>(state);
   // add current action to action LSTM
@@ -315,11 +315,11 @@ void LSTMParser::DoAction(unsigned action,
 
 
 LSTMTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
-    cnn::ComputationGraph* cg,
+    ComputationGraph* cg,
     const Sentence& raw_sent,
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-    const std::vector<unsigned>& correct_actions,
-    const std::vector<std::string>& action_names) {
+    const vector<unsigned>& correct_actions,
+    const vector<string>& action_names) {
   stack_lstm.new_graph(*cg);
   buffer_lstm.new_graph(*cg);
   action_lstm.new_graph(*cg);

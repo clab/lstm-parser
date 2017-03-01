@@ -33,9 +33,6 @@ protected:
 
   cnn::Model model;
 
-  LSTMTransitionTagger(const CorpusVocabulary& vocab)
-      : vocab(vocab), finalized(false) {}
-
   inline cnn::expr::Expression GetParamExpr(cnn::ParametersBase* params) {
     return param_expressions.at(params);
   }
@@ -55,7 +52,8 @@ protected:
                                const Sentence& raw_sent,
                                const Sentence::SentenceMap& sent) const = 0;
 
-  virtual bool IsActionForbidden(const std::string& action_name,
+  virtual bool IsActionForbidden(const unsigned action,
+                                 const std::vector<std::string>& action_names,
                                  const TaggerState& state) const = 0;
 
   virtual void DoAction(unsigned action,

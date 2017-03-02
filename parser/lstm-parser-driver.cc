@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
     }
 
     signal(SIGINT, signal_callback_handler);
-    ParserTrainingCorpus training_corpus(&parser->vocab,
+    ParserTrainingCorpus training_corpus(parser->GetVocab(),
                                          conf["training_data"].as<string>(),
                                          true);
     parser->FinalizeVocab();
@@ -161,8 +161,8 @@ int main(int argc, char** argv) {
          << endl;
     // OOV words will be replaced by UNK tokens
     dev_corpus.reset(
-        new ParserTrainingCorpus(&parser->vocab, conf["dev_data"].as<string>(),
-                                 false));
+        new ParserTrainingCorpus(parser->GetVocab(),
+                                 conf["dev_data"].as<string>(), false));
 
     ostringstream os;
     os << "parser_" << (parser->options.use_pos ? "pos" : "nopos")
@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
     cerr << "Evaluating model on " << conf["dev_data"].as<string>() << endl;
     if (!train) { // Didn't already load dev corpus for training
       dev_corpus.reset(
-          new ParserTrainingCorpus(&parser->vocab,
+          new ParserTrainingCorpus(parser->GetVocab(),
                                    conf["dev_data"].as<string>(), false));
     }
     parser->Evaluate(*dev_corpus);
@@ -213,7 +213,8 @@ int main(int argc, char** argv) {
            << endl;
       abort();
     }
-    Corpus test_corpus(&parser->vocab, *reader, conf["test_data"].as<string>());
+    Corpus test_corpus(parser->GetVocab(), *reader,
+                       conf["test_data"].as<string>());
     parser->Test(test_corpus);
   }
 }

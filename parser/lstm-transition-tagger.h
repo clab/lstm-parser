@@ -17,8 +17,6 @@ namespace lstm_parser {
 
 class LSTMTransitionTagger {
 public:
-  // TODO: this really shouldn't be public...
-  CorpusVocabulary vocab;
 
   LSTMTransitionTagger() : finalized(false) {}
   virtual ~LSTMTransitionTagger() {}
@@ -32,6 +30,11 @@ public:
       bool replace_unknowns = true,
       cnn::expr::Expression* final_parser_state = nullptr);
 
+  const lstm_parser::CorpusVocabulary& GetVocab() const { return vocab; }
+
+  // TODO: arrange things such that we don't need to expose this?
+  lstm_parser::CorpusVocabulary* GetVocab() { return &vocab; }
+
 protected:
   struct TaggerState {};
 
@@ -39,6 +42,7 @@ protected:
   std::map<cnn::Parameters*, cnn::expr::Expression> param_expressions;
 
   cnn::Model model;
+  CorpusVocabulary vocab;
 
   inline cnn::expr::Expression GetParamExpr(cnn::Parameters* params) {
     return param_expressions.at(params);

@@ -42,19 +42,27 @@ void LSTMTransitionTagger::FinalizeVocab() {
   finalized = true;
 }
 
-
-vector<unsigned> LSTMTransitionTagger::LogProbTagger(
-    const Sentence& sentence, const CorpusVocabulary& vocab,
-    ComputationGraph *cg, Expression* final_parser_state) {
-  Sentence::SentenceMap tsentence(sentence.words); // sentence w/ OOVs replaced
-  for (auto& index_and_id : tsentence) { // use reference to overwrite
+Sentence::SentenceMap LSTMTransitionTagger::ReplaceUnknowns(
+    const Sentence& sentence, const CorpusVocabulary& vocab) {
+  Sentence::SentenceMap tsentence(sentence.words);  // sentence w/ OOVs replaced
+  for (auto& index_and_id : tsentence) {
+    // use reference to overwrite
     if (!vocab.int_to_training_word[index_and_id.second]) {
       index_and_id.second = vocab.kUNK;
     }
   }
-  return LogProbTagger(cg, sentence, tsentence, vector<unsigned>(),
-                       vocab.actions, vocab.int_to_words, nullptr,
-                       final_parser_state);
+  return tsentence;
+}
+
+vector<unsigned> LSTMTransitionTagger::LogProbTagger(
+    const Sentence& sentence, const CorpusVocabulary& vocab,
+    ComputationGraph *cg, bool replace_unknowns,
+    Expression* final_parser_state) {
+  return LogProbTagger(
+      cg, sentence,
+      replace_unknowns ? ReplaceUnknowns(sentence, vocab) : sentence.words,
+      vector<unsigned>(), vocab.actions, vocab.int_to_words, nullptr,
+      final_parser_state);
 }
 
 

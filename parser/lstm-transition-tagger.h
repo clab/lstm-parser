@@ -25,15 +25,22 @@ public:
 
   void FinalizeVocab();
 
+  // Used for testing. Replaces OOV with UNK.
+  std::vector<unsigned> LogProbTagger(
+      const Sentence& sentence, const CorpusVocabulary& vocab,
+      cnn::ComputationGraph *cg,
+      bool replace_unknowns = true,
+      cnn::expr::Expression* final_parser_state = nullptr);
+
 protected:
   struct TaggerState {};
 
   bool finalized;
-  std::map<cnn::ParametersBase*, cnn::expr::Expression> param_expressions;
+  std::map<cnn::Parameters*, cnn::expr::Expression> param_expressions;
 
   cnn::Model model;
 
-  inline cnn::expr::Expression GetParamExpr(cnn::ParametersBase* params) {
+  inline cnn::expr::Expression GetParamExpr(cnn::Parameters* params) {
     return param_expressions.at(params);
   }
 
@@ -66,12 +73,6 @@ protected:
 
   void SaveModel(const std::string& model_fname, bool softlink_created);
 
-  // Used for testing. Replaces OOV with UNK.
-  std::vector<unsigned> LogProbTagger(
-      const Sentence& sentence, const CorpusVocabulary& vocab,
-      cnn::ComputationGraph *cg,
-      cnn::expr::Expression* final_parser_state = nullptr);
-
   // *** if correct_actions is empty, this runs greedy decoding ***
   // returns actions for input sentence (in training just returns the reference)
   // OOV handling: raw_sent will have the actual words
@@ -86,6 +87,9 @@ protected:
       const std::vector<std::string>& action_names,
       const std::vector<std::string>& int_to_words, double* correct,
       cnn::expr::Expression* final_parser_state = nullptr);
+
+  Sentence::SentenceMap ReplaceUnknowns(const Sentence& sentence,
+                                        const CorpusVocabulary& vocab);
 };
 
 } /* namespace lstm_parser */

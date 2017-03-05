@@ -1,4 +1,4 @@
-#include "lstm-transition-tagger.h"
+#include "neural-transition-tagger.h"
 
 #include <fstream>
 #include <string>
@@ -15,7 +15,7 @@ using namespace cnn::expr;
 namespace lstm_parser {
 
 
-void LSTMTransitionTagger::SaveModel(const string& model_fname,
+void NeuralTransitionTagger::SaveModel(const string& model_fname,
                                      bool softlink_created) {
   ofstream out_file(model_fname);
   eos::portable_oarchive archive(out_file);
@@ -35,14 +35,14 @@ void LSTMTransitionTagger::SaveModel(const string& model_fname,
 }
 
 
-void LSTMTransitionTagger::FinalizeVocab() {
+void NeuralTransitionTagger::FinalizeVocab() {
   if (finalized)
     return;
   InitializeNetworkParameters();
   finalized = true;
 }
 
-Sentence::SentenceMap LSTMTransitionTagger::ReplaceUnknowns(
+Sentence::SentenceMap NeuralTransitionTagger::ReplaceUnknowns(
     const Sentence& sentence, const CorpusVocabulary& vocab) {
   Sentence::SentenceMap tsentence(sentence.words);  // sentence w/ OOVs replaced
   for (auto& index_and_id : tsentence) {
@@ -54,7 +54,7 @@ Sentence::SentenceMap LSTMTransitionTagger::ReplaceUnknowns(
   return tsentence;
 }
 
-vector<unsigned> LSTMTransitionTagger::LogProbTagger(
+vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     const Sentence& sentence, const CorpusVocabulary& vocab,
     ComputationGraph *cg, bool replace_unknowns,
     Expression* final_parser_state) {
@@ -66,7 +66,7 @@ vector<unsigned> LSTMTransitionTagger::LogProbTagger(
 }
 
 
-vector<unsigned> LSTMTransitionTagger::LogProbTagger(
+vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     ComputationGraph* cg,
     const Sentence& raw_sent,  // raw sentence
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
@@ -89,7 +89,7 @@ vector<unsigned> LSTMTransitionTagger::LogProbTagger(
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction
   Expression p_t; // declared outside to allow access later
-  while (!ShouldTerminate(*state, raw_sent, sent)) {
+  while (!ShouldTerminate(*state)) {
     // Get list of possible actions for the current parser state.
     vector<unsigned> current_valid_actions;
     for (unsigned action = 0; action < action_names.size(); ++action) {

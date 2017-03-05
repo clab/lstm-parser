@@ -20,7 +20,7 @@
 #include "cnn/rnn.h"
 #include "corpus.h"
 #include "eos/portable_archive.hpp"
-#include "lstm-transition-tagger.h"
+#include "neural-transition-tagger.h"
 
 
 namespace lstm_parser {
@@ -113,7 +113,7 @@ private:
 };
 
 
-class LSTMParser : public LSTMTransitionTagger {
+class LSTMParser : public NeuralTransitionTagger {
 public:
   ParserOptions options;
 
@@ -209,6 +209,12 @@ protected:
     std::vector<cnn::expr::Expression> stack;  // subtree embeddings
     std::vector<int> stacki; // word position in sentence of head of subtree
 
+    ParserState(const Sentence& raw_sentence,
+                const Sentence::SentenceMap& sentence, Expression stack_guard)
+        : TaggerState {raw_sentence, sentence}, buffer(raw_sentence.Size() + 1),
+          bufferi(raw_sentence.Size() + 1), stack( {stack_guard}),
+          stacki( {-999}) {}
+
     ~ParserState() {
       assert(stack.size() == 2); // guard symbol, root
       assert(stacki.size() == 2);
@@ -219,7 +225,8 @@ protected:
 
   virtual std::vector<cnn::Parameters*> GetParameters() override {
     std::vector<cnn::Parameters*> all_params {p_pbias, p_H, p_D, p_R, p_cbias,
-        p_S, p_B, p_A, p_ib, p_w2l, p_p2a, p_abias, p_action_start};
+        p_S, p_B, p_A, p_ib, p_w2l, p_p2a, p_abias, p_action_start,
+        p_stack_guard};
     if (options.use_pos)
       all_params.push_back(p_p2l);
     if (p_t2l)
@@ -235,9 +242,7 @@ protected:
 
   virtual void InitializeNetworkParameters() override;
 
-  virtual bool ShouldTerminate(
-      const TaggerState& state, const Sentence& raw_sent,
-      const Sentence::SentenceMap& sent) const override {
+  virtual bool ShouldTerminate(const TaggerState& state) const override {
     const ParserState& real_state = static_cast<const ParserState&>(state);
     return real_state.stack.size() <= 2 && real_state.buffer.size() <= 1;
   }

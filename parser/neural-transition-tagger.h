@@ -1,5 +1,5 @@
-#ifndef LSTM_PARSER_PARSER_LSTM_TRANSITION_TAGGER_H_
-#define LSTM_PARSER_PARSER_LSTM_TRANSITION_TAGGER_H_
+#ifndef LSTM_PARSER_PARSER_NEURAL_TRANSITION_TAGGER_H_
+#define LSTM_PARSER_PARSER_NEURAL_TRANSITION_TAGGER_H_
 
 #include <map>
 #include <string>
@@ -15,11 +15,11 @@ class portable_oarchive;
 
 namespace lstm_parser {
 
-class LSTMTransitionTagger {
+class NeuralTransitionTagger {
 public:
 
-  LSTMTransitionTagger() : finalized(false) {}
-  virtual ~LSTMTransitionTagger() {}
+  NeuralTransitionTagger() : finalized(false) {}
+  virtual ~NeuralTransitionTagger() {}
 
   void FinalizeVocab();
 
@@ -30,13 +30,16 @@ public:
       bool replace_unknowns = true,
       cnn::expr::Expression* final_parser_state = nullptr);
 
-  const lstm_parser::CorpusVocabulary& GetVocab() const { return vocab; }
+  const CorpusVocabulary& GetVocab() const { return vocab; }
 
   // TODO: arrange things such that we don't need to expose this?
-  lstm_parser::CorpusVocabulary* GetVocab() { return &vocab; }
+  CorpusVocabulary* GetVocab() { return &vocab; }
 
 protected:
-  struct TaggerState {};
+  struct TaggerState {
+    const Sentence& raw_sentence;
+    const Sentence::SentenceMap& sentence;
+  };
 
   bool finalized;
   std::map<cnn::Parameters*, cnn::expr::Expression> param_expressions;
@@ -59,9 +62,7 @@ protected:
   virtual cnn::expr::Expression GetActionProbabilities(
       const TaggerState& state) = 0;
 
-  virtual bool ShouldTerminate(const TaggerState& state,
-                               const Sentence& raw_sent,
-                               const Sentence::SentenceMap& sent) const = 0;
+  virtual bool ShouldTerminate(const TaggerState& state) const = 0;
 
   virtual bool IsActionForbidden(const unsigned action,
                                  const std::vector<std::string>& action_names,
@@ -98,4 +99,4 @@ protected:
 
 } /* namespace lstm_parser */
 
-#endif /* LSTM_PARSER_PARSER_LSTM_TRANSITION_TAGGER_H_ */
+#endif /* LSTM_PARSER_PARSER_NEURAL_TRANSITION_TAGGER_H_ */

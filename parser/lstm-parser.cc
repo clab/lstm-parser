@@ -314,7 +314,7 @@ void LSTMParser::DoAction(unsigned action, const vector<string>& action_names,
 }
 
 
-LSTMTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
+NeuralTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
     ComputationGraph* cg,
     const Sentence& raw_sent,
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
@@ -327,15 +327,10 @@ LSTMTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
   buffer_lstm.start_new_sequence();
   action_lstm.start_new_sequence();
 
+  Expression stack_guard = GetParamExpr(p_stack_guard);
+  ParserState* state = new ParserState(raw_sent, sent, stack_guard);
   action_lstm.add_input(GetParamExpr(p_action_start));
-
-  ParserState* state = new ParserState;
-  state->buffer.resize(raw_sent.Size() + 1);
-  state->bufferi.resize(raw_sent.Size() + 1);
-  state->stack.push_back(parameter(*cg, p_stack_guard));
-  state->stacki.push_back(-999);
-  // drive dummy symbol on stack through LSTM
-  stack_lstm.add_input(state->stack.back());
+  stack_lstm.add_input(stack_guard);
 
   // precompute buffer representation from left to right
   unsigned added_to_buffer = 0;

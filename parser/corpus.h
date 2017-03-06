@@ -53,8 +53,8 @@ public:
       words_to_int(other.words_to_int), int_to_words(other.int_to_words),
       int_to_training_word(other.int_to_training_word),
       pos_to_int(other.pos_to_int), int_to_pos(other.int_to_pos),
-      chars_to_int(other.chars_to_int), int_to_chars(
-          other.int_to_chars), kUNK(other.kUNK) {}
+      chars_to_int(other.chars_to_int), int_to_chars(other.int_to_chars),
+      kUNK(other.kUNK) {}
 
   inline unsigned CountPOS() { return pos_to_int.size(); }
   inline unsigned CountWords() { return words_to_int.size(); }

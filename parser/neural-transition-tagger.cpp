@@ -39,6 +39,13 @@ void NeuralTransitionTagger::FinalizeVocab() {
   if (finalized)
     return;
   InitializeNetworkParameters();
+  // Give up memory we don't need.
+  vocab.actions.shrink_to_fit();
+  vocab.actions_to_arc_labels.shrink_to_fit();
+  vocab.int_to_chars.shrink_to_fit();
+  vocab.int_to_pos.shrink_to_fit();
+  vocab.int_to_training_word.shrink_to_fit();
+  vocab.int_to_words.shrink_to_fit();
   finalized = true;
 }
 

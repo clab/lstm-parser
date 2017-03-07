@@ -1,6 +1,10 @@
 project(cnn)
 cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
+if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_BUILD_TYPE RelWithDebInfo)
+endif(NOT CMAKE_BUILD_TYPE)
+
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # CNN uses Eigen which exploits modern CPU architectures. To get the

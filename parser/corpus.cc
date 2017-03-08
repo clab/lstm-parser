@@ -49,7 +49,7 @@ void ConllUCorpusReader::ReadSentences(const string& file,
         current_sentence_pos[Corpus::ROOT_TOKEN_ID] = root_pos_symbol;
         current_sentence_unk_surface_forms[Corpus::ROOT_TOKEN_ID] = "";
 
-        corpus->sentences.push_back({});
+        corpus->sentences.emplace_back(*corpus->vocab);
         corpus->sentences.back().words.swap(current_sentence);
         corpus->sentences.back().poses.swap(current_sentence_pos);
         corpus->sentences.back().unk_surface_forms.swap(
@@ -183,7 +183,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
     Sentence::SentenceMap* sentence_pos,
     Sentence::SentenceUnkMap* sentence_unk_surface_forms, bool final) const {
   // Store the sentence variables and clear them for the next sentence.
-  corpus->sentences.push_back({});
+  corpus->sentences.emplace_back(*corpus->vocab);
   Sentence* sentence = &corpus->sentences.back();
   sentence->words.swap(*words);
   sentence->poses.swap(*sentence_pos);

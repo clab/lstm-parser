@@ -10,6 +10,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -188,18 +189,47 @@ public:
 };
 
 
-struct Sentence {
+class Sentence;
+inline std::ostream& operator<<(std::ostream& os, const Sentence& sentence);
+
+class Sentence {
+public:
   typedef std::map<unsigned, unsigned> SentenceMap;
   typedef std::map<unsigned, std::string> SentenceUnkMap;
+
+  Sentence(const CorpusVocabulary& vocab) : vocab(vocab) {}
 
   SentenceMap words;
   SentenceMap poses;
   SentenceUnkMap unk_surface_forms;
+  const CorpusVocabulary& vocab;
 
   size_t Size() const {
     return words.size();
   }
+
+  std::string AsString() const {
+    std::ostringstream oss;
+    oss << *this;
+    return oss.str();
+  }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Sentence&sentence) {
+  for (auto &index_and_word_id : sentence.words) {
+    unsigned index = index_and_word_id.first;
+    unsigned word_id = index_and_word_id.second;
+    unsigned pos_id = sentence.poses.at(index);
+    auto unk_iter = sentence.unk_surface_forms.find(index);
+    os << (unk_iter == sentence.unk_surface_forms.end() ?
+            sentence.vocab.int_to_words.at(word_id) : unk_iter->second)
+       << '/' << sentence.vocab.int_to_pos.at(pos_id);
+    if (index != sentence.words.rend()->first) {
+      os << ' ';
+    }
+  }
+  return os;
+}
 
 
 class Corpus {

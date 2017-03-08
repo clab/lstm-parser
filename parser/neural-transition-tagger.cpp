@@ -54,7 +54,8 @@ Sentence::SentenceMap NeuralTransitionTagger::ReplaceUnknowns(
   Sentence::SentenceMap tsentence(sentence.words);  // sentence w/ OOVs replaced
   for (auto& index_and_id : tsentence) {
     // use reference to overwrite
-    if (!vocab.int_to_training_word[index_and_id.second]) {
+    if (index_and_id.second >= vocab.int_to_training_word.size()
+        || !vocab.int_to_training_word[index_and_id.second]) {
       index_and_id.second = vocab.kUNK;
     }
   }

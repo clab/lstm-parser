@@ -286,12 +286,13 @@ protected:
         Sentence::SentenceMap* sentence_pos,
         Sentence::SentenceUnkMap* sentence_unk_surface_forms) const;
 
-    void RecordAction(const std::string& action, TrainingCorpus* corpus) const;
+    void RecordAction(const std::string& action, TrainingCorpus* corpus,
+                      std::vector<unsigned>* correct_actions) const;
 
     void RecordSentence(TrainingCorpus* corpus, Sentence::SentenceMap* words,
                         Sentence::SentenceMap* sentence_pos,
                         Sentence::SentenceUnkMap* sentence_unk_surface_forms,
-                        bool final = false) const;
+                        std::vector<unsigned>* correct_actions) const;
 
     static inline unsigned UTF8Len(unsigned char x) {
       if (x < 0x80) return 1;

@@ -121,6 +121,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     unsigned action = best_a;
     // If we have reference actions (for training), use the reference action.
     if (build_training_graph) {
+      assert(action_count < correct_actions.size());
       action = correct_actions[action_count];
       if (correct && best_a == action) {
         (*correct)++;

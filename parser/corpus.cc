@@ -82,6 +82,8 @@ void ConllUCorpusReader::ReadSentences(const string& file,
     current_sentence[token_index] = word_id;
     current_sentence_pos[token_index] = corpus->vocab->GetPOS(pos);
   }
+
+  corpus->sentences.shrink_to_fit();
 }
 
 

@@ -333,6 +333,8 @@ private:
       ParserTrainingCorpus* training_corpus =
           static_cast<ParserTrainingCorpus*>(corpus);
       LoadCorrectActions(file, training_corpus);
+      training_corpus->sentences.shrink_to_fit();
+      training_corpus->correct_act_sent.shrink_to_fit();
     }
 
     virtual ~OracleParseTransitionsReader() {};

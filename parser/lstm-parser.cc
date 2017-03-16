@@ -171,9 +171,8 @@ bool LSTMParser::IsActionForbidden(const unsigned action,
 
 
 ParseTree LSTMParser::RecoverParseTree(
-    const Sentence& sentence, const vector<unsigned>& actions,
-    const vector<string>& action_names,
-    const vector<string>& actions_to_arc_labels, double logprob, bool labeled) {
+    const Sentence& sentence, const vector<unsigned>& actions, double logprob,
+    bool labeled) {
   ParseTree tree(sentence, labeled);
   vector<int> bufferi(sentence.Size() + 1);
   bufferi[0] = -999;
@@ -185,7 +184,7 @@ ParseTree LSTMParser::RecoverParseTree(
         index_and_word_id.first;
   }
   for (auto action : actions) { // loop over transitions for sentence
-    const string& action_string = action_names[action];
+    const string& action_string = vocab.actions[action];
     const char ac = action_string[0];
     const char ac2 = action_string[1];
     if (ac == 'S' && ac2 == 'H') {  // SHIFT
@@ -212,7 +211,7 @@ ParseTree LSTMParser::RecoverParseTree(
       (ac == 'R' ? headi : depi) = stacki.back();
       stacki.pop_back();
       stacki.push_back(headi);
-      tree.SetParent(depi, headi, actions_to_arc_labels[action]);
+      tree.SetParent(depi, headi, vocab.actions_to_arc_labels[action]);
     }
   }
   assert(bufferi.size() == 1);
@@ -465,9 +464,7 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
         llh += hyp.logprob;
 
         const vector<unsigned>& actions = dev_corpus.correct_act_sent[sii];
-        ParseTree ref = RecoverParseTree(
-            sentence, actions, dev_corpus.vocab->actions,
-            dev_corpus.vocab->actions_to_arc_labels);
+        ParseTree ref = RecoverParseTree(sentence, actions);
 
         trs += actions.size();
         correct_heads += ComputeCorrect(ref, hyp);
@@ -497,8 +494,7 @@ ParseTree LSTMParser::Parse(const Sentence& sentence,
   ComputationGraph cg;
   vector<unsigned> pred = LogProbTagger(sentence, vocab, &cg);
   double lp = as_scalar(cg.incremental_forward());
-  return RecoverParseTree(sentence, pred, vocab.actions,
-                          vocab.actions_to_arc_labels, labeled, lp);
+  return RecoverParseTree(sentence, pred, labeled, lp);
 }
 
 
@@ -530,9 +526,7 @@ void LSTMParser::DoTest(const Corpus& corpus, bool evaluate,
       const ParserTrainingCorpus& training_corpus =
           static_cast<const ParserTrainingCorpus&>(corpus);
       const vector<unsigned>& actions = training_corpus.correct_act_sent[sii];
-      ParseTree ref = RecoverParseTree(sentence, actions, corpus.vocab->actions,
-                                       corpus.vocab->actions_to_arc_labels,
-                                       true);
+      ParseTree ref = RecoverParseTree(sentence, actions, true);
       trs += actions.size();
       llh += hyp.logprob;
       correct_heads += ComputeCorrect(ref, hyp);

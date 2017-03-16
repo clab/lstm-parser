@@ -77,7 +77,7 @@ public:
   ParseTree(const Sentence& sentence, bool labeled = true) :
       sentence(sentence),
       logprob(0),
-      arc_labels( labeled ? new std::map<unsigned, std::string> : nullptr) {}
+      arc_labels(labeled ? new std::map<unsigned, std::string> : nullptr) {}
 
   inline void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {

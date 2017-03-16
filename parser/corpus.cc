@@ -160,14 +160,14 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
     const string& action, TrainingCorpus* corpus,
     vector<unsigned>* correct_actions) const {
   CorpusVocabulary* vocab = corpus->vocab;
-  auto action_iter = find(vocab->actions.begin(), vocab->actions.end(), action);
-  if (action_iter != vocab->actions.end()) {
-    unsigned action_index = distance(vocab->actions.begin(), action_iter);
+  auto action_iter = find(vocab->action_names.begin(), vocab->action_names.end(), action);
+  if (action_iter != vocab->action_names.end()) {
+    unsigned action_index = distance(vocab->action_names.begin(), action_iter);
     correct_actions->push_back(action_index);
   } else { // A not-previously-seen action
     if (is_training) {
-      vocab->actions.push_back(action);
-      unsigned action_index = vocab->actions.size() - 1;
+      vocab->action_names.push_back(action);
+      unsigned action_index = vocab->action_names.size() - 1;
       correct_actions->push_back(action_index);
       vocab->actions_to_arc_labels.push_back(vocab->GetLabelForAction(action));
     } else {
@@ -323,7 +323,7 @@ void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
 
   cerr << "done." << "\n";
   if (is_training) {
-    for (auto a : vocab->actions) {
+    for (auto a : vocab->action_names) {
       vocab->actions_to_arc_labels.push_back(vocab->GetLabelForAction(a));
       cerr << a << "\n";
     }

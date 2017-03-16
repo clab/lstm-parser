@@ -137,9 +137,8 @@ LSTMParser::LSTMParser(const ParserOptions& poptions,
 
 
 bool LSTMParser::IsActionForbidden(const unsigned action,
-                                   const vector<string>& action_names,
                                    const TaggerState& state) const {
-  const string& action_name = action_names[action];
+  const string& action_name = vocab.action_names[action];
   const ParserState& real_state = static_cast<const ParserState&>(state);
   unsigned ssize = real_state.stack.size();
   unsigned bsize = real_state.buffer.size();
@@ -184,7 +183,7 @@ ParseTree LSTMParser::RecoverParseTree(
         index_and_word_id.first;
   }
   for (auto action : actions) { // loop over transitions for sentence
-    const string& action_string = vocab.actions[action];
+    const string& action_string = vocab.action_names[action];
     const char ac = action_string[0];
     const char ac2 = action_string[1];
     if (ac == 'S' && ac2 == 'H') {  // SHIFT
@@ -236,8 +235,8 @@ Expression LSTMParser::GetActionProbabilities(const TaggerState& state) {
 }
 
 
-void LSTMParser::DoAction(unsigned action, const vector<string>& action_names,
-                          TaggerState* state, ComputationGraph* cg) {
+void LSTMParser::DoAction(unsigned action, TaggerState* state,
+                          ComputationGraph* cg) {
   ParserState* real_state = static_cast<ParserState*>(state);
   // add current action to action LSTM
   Expression action_e = lookup(*cg, p_a, action);
@@ -247,7 +246,7 @@ void LSTMParser::DoAction(unsigned action, const vector<string>& action_names,
   Expression relation = lookup(*cg, p_r, action);
 
   // do action
-  const string& action_string = action_names[action];
+  const string& action_string = vocab.action_names[action];
   const char ac = action_string[0];
   const char ac2 = action_string[1];
 
@@ -317,8 +316,7 @@ NeuralTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
     ComputationGraph* cg,
     const Sentence& raw_sent,
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-    const vector<unsigned>& correct_actions,
-    const vector<string>& action_names) {
+    const vector<unsigned>& correct_actions) {
   stack_lstm.new_graph(*cg);
   buffer_lstm.new_graph(*cg);
   action_lstm.new_graph(*cg);
@@ -423,9 +421,7 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
       }
       const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
       ComputationGraph hg;
-      LogProbTagger(&hg, sentence, tsentence, actions,
-                    corpus.vocab->actions, corpus.vocab->int_to_words,
-                    &correct);
+      LogProbTagger(&hg, sentence, tsentence, actions, &correct);
       double lp = as_scalar(hg.incremental_forward());
       if (lp < 0) {
         cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp
@@ -492,7 +488,7 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
 ParseTree LSTMParser::Parse(const Sentence& sentence,
                             const CorpusVocabulary& vocab, bool labeled) {
   ComputationGraph cg;
-  vector<unsigned> pred = LogProbTagger(sentence, vocab, &cg);
+  vector<unsigned> pred = LogProbTagger(sentence, &cg);
   double lp = as_scalar(cg.incremental_forward());
   return RecoverParseTree(sentence, pred, labeled, lp);
 }

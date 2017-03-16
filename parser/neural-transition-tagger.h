@@ -25,8 +25,7 @@ public:
 
   // Used for testing. Replaces OOV with UNK.
   std::vector<unsigned> LogProbTagger(
-      const Sentence& sentence, const CorpusVocabulary& vocab,
-      cnn::ComputationGraph *cg,
+      const Sentence& sentence, cnn::ComputationGraph *cg,
       bool replace_unknowns = true,
       cnn::expr::Expression* final_parser_state = nullptr);
 
@@ -56,8 +55,7 @@ protected:
   virtual TaggerState* InitializeParserState(
       cnn::ComputationGraph* hg, const Sentence& raw_sent,
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-      const std::vector<unsigned>& correct_actions,
-      const std::vector<std::string>& action_names) = 0;
+      const std::vector<unsigned>& correct_actions) = 0;
 
   virtual cnn::expr::Expression GetActionProbabilities(
       const TaggerState& state) = 0;
@@ -65,12 +63,10 @@ protected:
   virtual bool ShouldTerminate(const TaggerState& state) const = 0;
 
   virtual bool IsActionForbidden(const unsigned action,
-                                 const std::vector<std::string>& action_names,
                                  const TaggerState& state) const = 0;
 
-  virtual void DoAction(unsigned action,
-                        const std::vector<std::string>& action_names,
-                        TaggerState* state, cnn::ComputationGraph* cg) = 0;
+  virtual void DoAction(unsigned action, TaggerState* state,
+                        cnn::ComputationGraph* cg) = 0;
 
   virtual void DoSave(eos::portable_oarchive& archive) = 0;
 
@@ -89,12 +85,9 @@ protected:
       const Sentence& sentence, // raw sentence
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
       const std::vector<unsigned>& correct_actions,
-      const std::vector<std::string>& action_names,
-      const std::vector<std::string>& int_to_words, double* correct,
-      cnn::expr::Expression* final_parser_state = nullptr);
+      double* correct, cnn::expr::Expression* final_parser_state = nullptr);
 
-  Sentence::SentenceMap ReplaceUnknowns(const Sentence& sentence,
-                                        const CorpusVocabulary& vocab);
+  Sentence::SentenceMap ReplaceUnknowns(const Sentence& sentence);
 };
 
 } /* namespace lstm_parser */

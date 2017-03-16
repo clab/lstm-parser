@@ -40,7 +40,7 @@ void NeuralTransitionTagger::FinalizeVocab() {
     return;
   InitializeNetworkParameters();
   // Give up memory we don't need.
-  vocab.actions.shrink_to_fit();
+  vocab.action_names.shrink_to_fit();
   vocab.actions_to_arc_labels.shrink_to_fit();
   vocab.int_to_chars.shrink_to_fit();
   vocab.int_to_pos.shrink_to_fit();
@@ -50,7 +50,7 @@ void NeuralTransitionTagger::FinalizeVocab() {
 }
 
 Sentence::SentenceMap NeuralTransitionTagger::ReplaceUnknowns(
-    const Sentence& sentence, const CorpusVocabulary& vocab) {
+    const Sentence& sentence) {
   Sentence::SentenceMap tsentence(sentence.words);  // sentence w/ OOVs replaced
   for (auto& index_and_id : tsentence) {
     // use reference to overwrite
@@ -63,14 +63,12 @@ Sentence::SentenceMap NeuralTransitionTagger::ReplaceUnknowns(
 }
 
 vector<unsigned> NeuralTransitionTagger::LogProbTagger(
-    const Sentence& sentence, const CorpusVocabulary& vocab,
-    ComputationGraph *cg, bool replace_unknowns,
+    const Sentence& sentence, ComputationGraph *cg, bool replace_unknowns,
     Expression* final_parser_state) {
   return LogProbTagger(
       cg, sentence,
-      replace_unknowns ? ReplaceUnknowns(sentence, vocab) : sentence.words,
-      vector<unsigned>(), vocab.actions, vocab.int_to_words, nullptr,
-      final_parser_state);
+      replace_unknowns ? ReplaceUnknowns(sentence) : sentence.words,
+      vector<unsigned>(), nullptr, final_parser_state);
 }
 
 
@@ -78,8 +76,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     ComputationGraph* cg,
     const Sentence& raw_sent,  // raw sentence
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-    const vector<unsigned>& correct_actions, const vector<string>& action_names,
-    const vector<string>& int_to_words, double* correct,
+    const vector<unsigned>& correct_actions, double* correct,
     Expression* final_parser_state) {
   assert(finalized);
   vector<unsigned> results;
@@ -91,8 +88,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
   }
 
   unique_ptr<TaggerState> state(InitializeParserState(cg, raw_sent, sent,
-                                                      correct_actions,
-                                                      action_names));
+                                                      correct_actions));
 
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction
@@ -100,8 +96,8 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
   while (!ShouldTerminate(*state)) {
     // Get list of possible actions for the current parser state.
     vector<unsigned> current_valid_actions;
-    for (unsigned action = 0; action < action_names.size(); ++action) {
-      if (IsActionForbidden(action, action_names, *state))
+    for (unsigned action = 0; action < vocab.action_names.size(); ++action) {
+      if (IsActionForbidden(action, *state))
         continue;
       current_valid_actions.push_back(action);
     }
@@ -131,7 +127,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     log_probs.push_back(pick(adiste, action));
     results.push_back(action);
 
-    DoAction(action, action_names, state.get(), cg);
+    DoAction(action, state.get(), cg);
   }
 
   Expression tot_neglogprob = -sum(log_probs);

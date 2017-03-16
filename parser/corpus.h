@@ -36,7 +36,7 @@ public:
   StrToIntMap chars_to_int;
   std::vector<std::string> int_to_chars;
 
-  std::vector<std::string> actions;
+  std::vector<std::string> action_names;
   std::vector<std::string> actions_to_arc_labels;
 
   unsigned kUNK;
@@ -50,7 +50,7 @@ public:
   inline unsigned CountPOS() { return pos_to_int.size(); }
   inline unsigned CountWords() { return words_to_int.size(); }
   inline unsigned CountChars() { return chars_to_int.size(); }
-  inline unsigned CountActions() { return actions.size(); }
+  inline unsigned CountActions() { return action_names.size(); }
 
   inline unsigned GetWord(const std::string& word) const {
     auto word_iter = words_to_int.find(word);
@@ -118,7 +118,7 @@ private:
     ar & vocab->int_to_pos;
     ar & vocab->int_to_chars;
     ar & vocab->int_to_training_word;
-    ar & vocab->actions;
+    ar & vocab->action_names;
   }
 
   template<class Archive>
@@ -152,7 +152,7 @@ private:
       chars_to_int[int_to_chars[i]] = i;
 
     // ...and the arc labels.
-    for (const std::string& action : actions) {
+    for (const std::string& action : action_names) {
       actions_to_arc_labels.push_back(GetLabelForAction(action));
     }
   }

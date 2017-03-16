@@ -82,7 +82,7 @@ public:
   inline void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {
     parents[child_index] = parent_index;
-    if (arc_labels) {
+    if (IsLabeled()) {
       (*arc_labels)[child_index] = arc_label;
     }
   }
@@ -97,7 +97,7 @@ public:
   }
 
   const inline std::string& GetArcLabel(unsigned child) const {
-    if (!arc_labels)
+    if (!IsLabeled())
       return NO_LABEL;
     auto arc_label_iter = arc_labels->find(child);
     if (arc_label_iter == arc_labels->end()) {
@@ -106,6 +106,8 @@ public:
       return arc_label_iter->second;
     }
   }
+
+  bool IsLabeled() const { return arc_labels.get(); }
 
 private:
   std::map<unsigned, unsigned> parents;

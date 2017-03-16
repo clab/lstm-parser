@@ -67,17 +67,16 @@ struct ParserOptions {
 };
 
 
+// Barebones representation of a parse tree.
 class ParseTree {
 public:
   static std::string NO_LABEL;
-  // Barebones representation of a parse tree.
-  const Sentence& sentence;
   double logprob;
 
   ParseTree(const Sentence& sentence, bool labeled = true) :
-      sentence(sentence),
       logprob(0),
-      arc_labels(labeled ? new std::map<unsigned, std::string> : nullptr) {}
+      arc_labels(labeled ? new std::map<unsigned, std::string> : nullptr),
+      sentence(sentence) {}
 
   inline void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {
@@ -85,6 +84,10 @@ public:
     if (IsLabeled()) {
       (*arc_labels)[child_index] = arc_label;
     }
+  }
+
+  const Sentence& GetSentence() const {
+    return sentence.get();
   }
 
   const inline unsigned GetParent(unsigned child) const {
@@ -112,6 +115,7 @@ public:
 private:
   std::map<unsigned, unsigned> parents;
   std::unique_ptr<std::map<unsigned, std::string>> arc_labels;
+  std::reference_wrapper<const Sentence> sentence;
 };
 
 
@@ -259,9 +263,9 @@ protected:
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {
-    assert(ref.sentence.Size() == hyp.sentence.Size());
+    assert(ref.GetSentence().Size() == hyp.GetSentence().Size());
     unsigned correct_count = 0;
-    for (const auto& token_index_and_word : ref.sentence.words) {
+    for (const auto& token_index_and_word : ref.GetSentence().words) {
       unsigned i = token_index_and_word.first;
       if (i != Corpus::ROOT_TOKEN_ID && ref.GetParent(i) == hyp.GetParent(i))
         ++correct_count;

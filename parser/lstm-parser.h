@@ -188,7 +188,7 @@ public:
   // take a vector of actions and return a parse tree
   ParseTree RecoverParseTree(
       const Sentence& sentence, const std::vector<unsigned>& actions,
-      double logprob = 0, bool labeled = false);
+      double logprob = 0, bool labeled = false) const;
 
   void Train(const ParserTrainingCorpus& corpus,
              const ParserTrainingCorpus& dev_corpus, const double unk_prob,

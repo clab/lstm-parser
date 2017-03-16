@@ -171,7 +171,7 @@ bool LSTMParser::IsActionForbidden(const unsigned action,
 
 ParseTree LSTMParser::RecoverParseTree(
     const Sentence& sentence, const vector<unsigned>& actions, double logprob,
-    bool labeled) {
+    bool labeled) const {
   ParseTree tree(sentence, labeled);
   vector<int> bufferi(sentence.Size() + 1);
   bufferi[0] = -999;

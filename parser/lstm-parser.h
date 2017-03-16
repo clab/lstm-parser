@@ -153,7 +153,7 @@ public:
 
   explicit LSTMParser(const std::string& model_path) :
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
-    std::cerr << "Loading model from " << model_path << "...";
+    std::cerr << "Loading parser model from " << model_path << "...";
     auto t_start = std::chrono::high_resolution_clock::now();
     std::ifstream model_file(model_path.c_str(), std::ios::binary);
     if (!model_file) {

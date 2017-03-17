@@ -70,7 +70,8 @@ struct ParserOptions {
 // Barebones representation of a parse tree.
 class ParseTree {
 public:
-  static std::string NO_LABEL;
+  static const std::string NO_LABEL;
+
   double logprob;
 
   ParseTree(const Sentence& sentence, bool labeled = true) :

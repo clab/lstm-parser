@@ -23,7 +23,7 @@ using namespace std;
 namespace lstm_parser {
 
 
-string ParseTree::NO_LABEL = "ERROR";
+const string ParseTree::NO_LABEL("ERROR");
 
 
 void LSTMParser::LoadPretrainedWords(const string& words_path) {

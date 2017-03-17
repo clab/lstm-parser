@@ -78,7 +78,17 @@ public:
       arc_labels(labeled ? new std::map<unsigned, std::string> : nullptr),
       sentence(sentence) {}
 
-  inline void SetParent(unsigned child_index, unsigned parent_index,
+  ParseTree(const ParseTree& other)
+      : logprob(other.logprob), parents(other.parents),
+        arc_labels(other.IsLabeled() ?
+            new std::map<unsigned, std::string>(*other.arc_labels) : nullptr),
+        sentence(other.sentence) {}
+
+  ParseTree(ParseTree&& other) = default;
+
+  ParseTree& operator=(ParseTree&& other) = default;
+
+  void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {
     parents[child_index] = parent_index;
     if (IsLabeled()) {
@@ -90,7 +100,7 @@ public:
     return sentence.get();
   }
 
-  const inline unsigned GetParent(unsigned child) const {
+  const unsigned GetParent(unsigned child) const {
     auto parent_iter = parents.find(child);
     if (parent_iter == parents.end()) {
       return Corpus::ROOT_TOKEN_ID; // This is the best guess we've got.
@@ -99,7 +109,7 @@ public:
     }
   }
 
-  const inline std::string& GetArcLabel(unsigned child) const {
+  const std::string& GetArcLabel(unsigned child) const {
     if (!IsLabeled())
       return NO_LABEL;
     auto arc_label_iter = arc_labels->find(child);
@@ -112,7 +122,7 @@ public:
 
   bool IsLabeled() const { return arc_labels.get(); }
 
-private:
+protected:
   std::map<unsigned, unsigned> parents;
   std::unique_ptr<std::map<unsigned, std::string>> arc_labels;
   std::reference_wrapper<const Sentence> sentence;

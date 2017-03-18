@@ -160,6 +160,7 @@ void LookupParameters::clear() {
 
 Model::~Model() {
   for (auto p : all_params) delete p;
+  default_device->mem->free(gradient_norm_scratch);
 }
 
 void Model::project_weights(float radius) {

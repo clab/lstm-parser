@@ -35,8 +35,12 @@ public:
 
 protected:
   struct TaggerState {
+    TaggerState(const Sentence& raw_sentence,
+                const Sentence::SentenceMap& sentence)
+        : raw_sentence(raw_sentence), sentence(sentence) {}
     const Sentence& raw_sentence;
     const Sentence::SentenceMap& sentence;
+    virtual ~TaggerState() {}
   };
 
   bool finalized;

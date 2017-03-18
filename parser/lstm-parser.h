@@ -231,9 +231,9 @@ protected:
 
     ParserState(const Sentence& raw_sentence,
                 const Sentence::SentenceMap& sentence, Expression stack_guard)
-        : TaggerState {raw_sentence, sentence}, buffer(raw_sentence.Size() + 1),
-          bufferi(raw_sentence.Size() + 1), stack( {stack_guard}),
-          stacki( {-999}) {}
+        : TaggerState(raw_sentence, sentence), buffer(raw_sentence.Size() + 1),
+          bufferi(raw_sentence.Size() + 1), stack({stack_guard}),
+          stacki({-999}) {}
 
     ~ParserState() {
       assert(stack.size() == 2); // guard symbol, root

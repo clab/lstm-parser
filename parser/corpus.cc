@@ -204,7 +204,7 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
 
 void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
     const string& file, ParserTrainingCorpus* corpus) const {
-  cerr << "Loading " << (is_training ? "training" : "dev")
+  cerr << "Loading " << (is_training ? "training" : "dev/test")
        << " corpus from " << file << "..." << endl;
   ifstream actions_file(file);
   if (!actions_file) {

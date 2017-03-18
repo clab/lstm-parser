@@ -74,37 +74,37 @@ void LSTMParser::InitializeNetworkParameters() {
 
   if (!pretrained.empty()) {
     unsigned pretrained_dim = pretrained.begin()->second.size();
-    p_t = model.add_lookup_parameters(vocab_size, {pretrained_dim});
+    p_t = model->add_lookup_parameters(vocab_size, {pretrained_dim});
     for (const auto& it : pretrained)
       p_t->Initialize(it.first, it.second);
-    p_t2l = model.add_parameters({options.lstm_input_dim, pretrained_dim});
+    p_t2l = model->add_parameters({options.lstm_input_dim, pretrained_dim});
   } else {
     p_t = nullptr;
     p_t2l = nullptr;
   }
 
-  p_w = model.add_lookup_parameters(vocab_size, {options.input_dim});
-  p_a = model.add_lookup_parameters(action_size, {options.action_dim});
-  p_r = model.add_lookup_parameters(action_size, {options.rel_dim});
-  p_pbias = model.add_parameters({options.hidden_dim});
-  p_A = model.add_parameters({options.hidden_dim, options.hidden_dim});
-  p_B = model.add_parameters({options.hidden_dim, options.hidden_dim});
-  p_S = model.add_parameters({options.hidden_dim, options.hidden_dim});
-  p_H = model.add_parameters({options.lstm_input_dim, options.lstm_input_dim});
-  p_D = model.add_parameters({options.lstm_input_dim, options.lstm_input_dim});
-  p_R = model.add_parameters({options.lstm_input_dim, options.rel_dim});
-  p_w2l = model.add_parameters({options.lstm_input_dim, options.input_dim});
-  p_ib = model.add_parameters({options.lstm_input_dim});
-  p_cbias = model.add_parameters({options.lstm_input_dim});
-  p_p2a = model.add_parameters({action_size, options.hidden_dim});
-  p_action_start = model.add_parameters({options.action_dim});
-  p_abias = model.add_parameters({action_size});
-  p_buffer_guard = model.add_parameters({options.lstm_input_dim});
-  p_stack_guard = model.add_parameters({options.lstm_input_dim});
+  p_w = model->add_lookup_parameters(vocab_size, {options.input_dim});
+  p_a = model->add_lookup_parameters(action_size, {options.action_dim});
+  p_r = model->add_lookup_parameters(action_size, {options.rel_dim});
+  p_pbias = model->add_parameters({options.hidden_dim});
+  p_A = model->add_parameters({options.hidden_dim, options.hidden_dim});
+  p_B = model->add_parameters({options.hidden_dim, options.hidden_dim});
+  p_S = model->add_parameters({options.hidden_dim, options.hidden_dim});
+  p_H = model->add_parameters({options.lstm_input_dim, options.lstm_input_dim});
+  p_D = model->add_parameters({options.lstm_input_dim, options.lstm_input_dim});
+  p_R = model->add_parameters({options.lstm_input_dim, options.rel_dim});
+  p_w2l = model->add_parameters({options.lstm_input_dim, options.input_dim});
+  p_ib = model->add_parameters({options.lstm_input_dim});
+  p_cbias = model->add_parameters({options.lstm_input_dim});
+  p_p2a = model->add_parameters({action_size, options.hidden_dim});
+  p_action_start = model->add_parameters({options.action_dim});
+  p_abias = model->add_parameters({action_size});
+  p_buffer_guard = model->add_parameters({options.lstm_input_dim});
+  p_stack_guard = model->add_parameters({options.lstm_input_dim});
 
   if (options.use_pos) {
-    p_p = model.add_lookup_parameters(pos_size, {options.pos_dim});
-    p_p2l = model.add_parameters({options.lstm_input_dim, options.pos_dim});
+    p_p = model->add_lookup_parameters(pos_size, {options.pos_dim});
+    p_p2l = model->add_parameters({options.lstm_input_dim, options.pos_dim});
   } else {
     p_p = nullptr;
     p_p2l = nullptr;
@@ -117,11 +117,11 @@ LSTMParser::LSTMParser(const ParserOptions& poptions,
       options(poptions),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)),
       stack_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
-                 &model),
+                 model.get()),
       buffer_lstm(options.layers, options.lstm_input_dim, options.hidden_dim,
-                  &model),
+                  model.get()),
       action_lstm(options.layers, options.action_dim, options.hidden_dim,
-                  &model) {
+                  model.get()) {
   // First load words if needed before creating network parameters.
   // That will ensure that the vocab has the final number of words.
   if (!pretrained_words_path.empty()) {
@@ -373,8 +373,8 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
   bool softlink_created = false;
   int best_correct_heads = 0;
   unsigned status_every_i_iterations = 100;
-  SimpleSGDTrainer sgd(&model);
-  //MomentumSGDTrainer sgd(model);
+  SimpleSGDTrainer sgd(model.get());
+  //MomentumSGDTrainer sgd(model.get());
   sgd.eta_decay = 0.08;
   //sgd.eta_decay = 0.05;
   unsigned num_sentences = corpus.sentences.size();

@@ -38,6 +38,8 @@ void NeuralTransitionTagger::SaveModel(const string& model_fname,
 void NeuralTransitionTagger::FinalizeVocab() {
   if (finalized)
     return;
+  if (!model.get())
+    model.reset(new Model);
   InitializeNetworkParameters();
   // Give up memory we don't need.
   vocab.action_names.shrink_to_fit();

@@ -299,7 +299,7 @@ private:
     ar & options;
     ar & vocab;
     ar & pretrained;
-    ar & model;
+    ar & *model;
   }
 
   template<class Archive>
@@ -312,19 +312,19 @@ private:
     ar & pretrained;
     // Don't finalize yet...we want to finalize once our model is initialized.
 
-    model = cnn::Model();
+    model.reset(new cnn::Model);
     // Reset the LSTMs *before* reading in the network model, to make sure the
     // model knows how big it's supposed to be.
     stack_lstm = cnn::LSTMBuilder(options.layers, options.lstm_input_dim,
-                                  options.hidden_dim, &model);
+                                  options.hidden_dim, model.get());
     buffer_lstm = cnn::LSTMBuilder(options.layers, options.lstm_input_dim,
-                                   options.hidden_dim, &model);
+                                   options.hidden_dim, model.get());
     action_lstm = cnn::LSTMBuilder(options.layers, options.action_dim,
-                                   options.hidden_dim, &model);
+                                   options.hidden_dim, model.get());
 
     FinalizeVocab(); // OK, now finalize. :)
 
-    ar & model;
+    ar & *model;
   }
   BOOST_SERIALIZATION_SPLIT_MEMBER();
 

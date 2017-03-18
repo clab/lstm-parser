@@ -77,13 +77,13 @@ public:
   ParseTree(const Sentence& sentence, bool labeled = true) :
       logprob(0),
       arc_labels(labeled ? new std::map<unsigned, std::string> : nullptr),
-      sentence(sentence) {}
+      sentence(sentence), root_child(-1) {}
 
   ParseTree(const ParseTree& other)
       : logprob(other.logprob), parents(other.parents),
         arc_labels(other.IsLabeled() ?
             new std::map<unsigned, std::string>(*other.arc_labels) : nullptr),
-        sentence(other.sentence) {}
+        sentence(other.sentence), root_child(-1) {}
 
   ParseTree(ParseTree&& other) = default;
 
@@ -94,6 +94,9 @@ public:
     parents[child_index] = parent_index;
     if (IsLabeled()) {
       (*arc_labels)[child_index] = arc_label;
+    }
+    if (parent_index == Corpus::ROOT_TOKEN_ID) {
+      root_child = child_index;
     }
   }
 
@@ -121,12 +124,15 @@ public:
     }
   }
 
+  const unsigned GetRootChild() const { return root_child; }
+
   bool IsLabeled() const { return arc_labels.get(); }
 
 protected:
   std::map<unsigned, unsigned> parents;
   std::unique_ptr<std::map<unsigned, std::string>> arc_labels;
   std::reference_wrapper<const Sentence> sentence;
+  unsigned root_child;
 };
 
 

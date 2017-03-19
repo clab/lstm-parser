@@ -10,7 +10,6 @@
 #include <map>
 #include <set>
 #include <string>
-#include <sstream>
 #include <utility>
 #include <vector>
 
@@ -208,12 +207,6 @@ public:
     return words.size();
   }
 
-  std::string AsString() const {
-    std::ostringstream oss;
-    oss << *this;
-    return oss.str();
-  }
-
   const std::string& WordForToken(unsigned token_id) const {
     unsigned word_id = words.at(token_id);
     return word_id == vocab.kUNK ? unk_surface_forms.at(token_id)
@@ -221,7 +214,7 @@ public:
   }
 };
 
-inline std::ostream& operator<<(std::ostream& os, const Sentence&sentence) {
+inline std::ostream& operator<<(std::ostream& os, const Sentence& sentence) {
   for (auto &index_and_word_id : sentence.words) {
     unsigned index = index_and_word_id.first;
     unsigned word_id = index_and_word_id.second;

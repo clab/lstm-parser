@@ -213,6 +213,12 @@ public:
     oss << *this;
     return oss.str();
   }
+
+  const std::string& WordForToken(unsigned token_id) const {
+    unsigned word_id = words.at(token_id);
+    return word_id == vocab.kUNK ? unk_surface_forms.at(token_id)
+                                 : vocab.int_to_words[word_id];
+  }
 };
 
 inline std::ostream& operator<<(std::ostream& os, const Sentence&sentence) {

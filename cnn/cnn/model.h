@@ -103,6 +103,15 @@ struct LookupParameters : public ParametersBase {
 class Model {
  public:
   Model() : gradient_norm_scratch() {}
+  Model(const Model&) = delete;
+  Model(Model&& m) {
+    all_params = std::move(m.all_params);
+    lookup_params = std::move(m.lookup_params);
+    params = std::move(m.params);
+    // Free our scratch memory before claiming the other model's.
+    default_device->mem->free(gradient_norm_scratch);
+    gradient_norm_scratch = m.gradient_norm_scratch;
+  }
   ~Model();
   float gradient_l2_norm() const;
   void reset_gradient();

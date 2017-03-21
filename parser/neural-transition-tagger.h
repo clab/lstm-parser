@@ -38,8 +38,9 @@ public:
       cnn::ComputationGraph* cg,
       const Sentence& sentence, // raw sentence
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-      const std::vector<unsigned>& correct_actions,
-      double* correct, cnn::expr::Expression* final_parser_state = nullptr);
+      const std::vector<unsigned>& correct_actions = std::vector<unsigned>(),
+      double* correct = nullptr,
+      cnn::expr::Expression* final_parser_state = nullptr);
 
   const CorpusVocabulary& GetVocab() const { return vocab; }
 

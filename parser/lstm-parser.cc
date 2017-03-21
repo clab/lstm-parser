@@ -488,7 +488,7 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
 ParseTree LSTMParser::Parse(const Sentence& sentence,
                             const CorpusVocabulary& vocab, bool labeled) {
   ComputationGraph cg;
-  vector<unsigned> pred = LogProbTagger(sentence, &cg);
+  vector<unsigned> pred = LogProbTagger(&cg, sentence);
   double lp = as_scalar(cg.incremental_forward());
   return RecoverParseTree(sentence, pred, labeled, lp);
 }

@@ -24,7 +24,7 @@ public:
 
   // Used for testing. Replaces OOV with UNK.
   std::vector<unsigned> LogProbTagger(
-      const Sentence& sentence, cnn::ComputationGraph *cg,
+      cnn::ComputationGraph *cg, const Sentence& sentence,
       bool replace_unknowns = true,
       cnn::expr::Expression* final_parser_state = nullptr);
 

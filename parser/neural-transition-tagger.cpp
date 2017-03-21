@@ -65,7 +65,7 @@ Sentence::SentenceMap NeuralTransitionTagger::ReplaceUnknowns(
 }
 
 vector<unsigned> NeuralTransitionTagger::LogProbTagger(
-    const Sentence& sentence, ComputationGraph *cg, bool replace_unknowns,
+    ComputationGraph *cg, const Sentence& sentence, bool replace_unknowns,
     Expression* final_parser_state) {
   return LogProbTagger(
       cg, sentence,

@@ -420,15 +420,15 @@ void LSTMParser::Train(const ParserTrainingCorpus& corpus,
         }
       }
       const vector<unsigned>& actions = corpus.correct_act_sent[order[si]];
-      ComputationGraph hg;
-      LogProbTagger(&hg, sentence, tsentence, actions, &correct);
-      double lp = as_scalar(hg.incremental_forward());
+      ComputationGraph cg;
+      LogProbTagger(&cg, sentence, tsentence, actions, &correct);
+      double lp = as_scalar(cg.incremental_forward());
       if (lp < 0) {
         cerr << "Log prob < 0 on sentence " << order[si] << ": lp=" << lp
              << endl;
         assert(lp >= 0.0);
       }
-      hg.backward();
+      cg.backward();
       sgd.update(1.0);
       llh += lp;
       ++si;

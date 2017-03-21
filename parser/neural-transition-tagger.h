@@ -28,6 +28,19 @@ public:
       bool replace_unknowns = true,
       cnn::expr::Expression* final_parser_state = nullptr);
 
+  // *** if correct_actions is empty, this runs greedy decoding ***
+  // returns actions for input sentence (in training just returns the reference)
+  // OOV handling: raw_sent will have the actual words
+  //               sent will have words replaced by appropriate UNK tokens
+  // this lets us use pretrained embeddings, when available, for words that were
+  // OOV in the training data.
+  std::vector<unsigned> LogProbTagger(
+      cnn::ComputationGraph* cg,
+      const Sentence& sentence, // raw sentence
+      const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
+      const std::vector<unsigned>& correct_actions,
+      double* correct, cnn::expr::Expression* final_parser_state = nullptr);
+
   const CorpusVocabulary& GetVocab() const { return vocab; }
 
   // TODO: arrange things such that we don't need to expose this?
@@ -77,19 +90,6 @@ protected:
   virtual void InitializeNetworkParameters() = 0;
 
   void SaveModel(const std::string& model_fname, bool softlink_created);
-
-  // *** if correct_actions is empty, this runs greedy decoding ***
-  // returns actions for input sentence (in training just returns the reference)
-  // OOV handling: raw_sent will have the actual words
-  //               sent will have words replaced by appropriate UNK tokens
-  // this lets us use pretrained embeddings, when available, for words that were
-  // OOV in the training data.
-  std::vector<unsigned> LogProbTagger(
-      cnn::ComputationGraph* hg,
-      const Sentence& sentence, // raw sentence
-      const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-      const std::vector<unsigned>& correct_actions,
-      double* correct, cnn::expr::Expression* final_parser_state = nullptr);
 
   Sentence::SentenceMap ReplaceUnknowns(const Sentence& sentence);
 };

@@ -26,7 +26,12 @@ public:
   std::vector<unsigned> LogProbTagger(
       cnn::ComputationGraph *cg, const Sentence& sentence,
       bool replace_unknowns = true,
-      cnn::expr::Expression* final_parser_state = nullptr);
+      cnn::expr::Expression* final_parser_state = nullptr) {
+    return LogProbTagger(
+        cg, sentence,
+        replace_unknowns ? ReplaceUnknowns(sentence) : sentence.words,
+        false, std::vector<unsigned>(), nullptr, final_parser_state);
+  }
 
   // *** if correct_actions is empty, this runs greedy decoding ***
   // returns actions for input sentence (in training just returns the reference)
@@ -38,6 +43,7 @@ public:
       cnn::ComputationGraph* cg,
       const Sentence& sentence, // raw sentence
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
+      bool training = false,
       const std::vector<unsigned>& correct_actions = std::vector<unsigned>(),
       double* correct = nullptr,
       cnn::expr::Expression* final_parser_state = nullptr);

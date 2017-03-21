@@ -64,25 +64,16 @@ Sentence::SentenceMap NeuralTransitionTagger::ReplaceUnknowns(
   return tsentence;
 }
 
-vector<unsigned> NeuralTransitionTagger::LogProbTagger(
-    ComputationGraph *cg, const Sentence& sentence, bool replace_unknowns,
-    Expression* final_parser_state) {
-  return LogProbTagger(
-      cg, sentence,
-      replace_unknowns ? ReplaceUnknowns(sentence) : sentence.words,
-      vector<unsigned>(), nullptr, final_parser_state);
-}
-
 
 vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     ComputationGraph* cg,
     const Sentence& raw_sent,  // raw sentence
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
+    bool training,
     const vector<unsigned>& correct_actions, double* correct,
     Expression* final_parser_state) {
   assert(finalized);
   vector<unsigned> results;
-  const bool build_training_graph = correct_actions.size() > 0;
 
   // variables in the computation graph representing the parameters
   for (Parameters *params : GetParameters()) {
@@ -117,8 +108,8 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
       }
     }
     unsigned action = best_a;
-    // If we have reference actions (for training), use the reference action.
-    if (build_training_graph) {
+    // If we're training, use the reference action.
+    if (training) {
       assert(action_count < correct_actions.size());
       action = correct_actions[action_count];
       if (correct && best_a == action) {

@@ -10,6 +10,7 @@ ExecutionEngine::~ExecutionEngine() {}
 
 void SimpleExecutionEngine::invalidate() {
   num_nodes_evaluated = 0;
+  fxs->free();
 }
 
 const Tensor& SimpleExecutionEngine::forward() { 

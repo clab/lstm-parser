@@ -72,6 +72,8 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     bool training,
     const vector<unsigned>& correct_actions, double* correct,
     Expression* final_parser_state) {
+  if (training)
+    assert(!correct_actions.empty());
   assert(finalized);
   vector<unsigned> results;
 
@@ -108,13 +110,16 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
       }
     }
     unsigned action = best_a;
-    // If we're training, use the reference action.
-    if (training) {
+
+    if (!correct_actions.empty()) {
       assert(action_count < correct_actions.size());
-      action = correct_actions[action_count];
-      if (correct && best_a == action) {
+      unsigned correct_action = correct_actions[action_count];
+      if (correct && best_a == correct_action) {
         (*correct)++;
       }
+      // If we're training, use the reference action.
+      if (training)
+        action = correct_action;
     }
     ++action_count;
     log_probs.push_back(pick(adiste, action));

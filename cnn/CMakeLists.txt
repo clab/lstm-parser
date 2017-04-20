@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(CMAKE_BUILD_TYPE RelWithDebInfo)
-endif(NOT CMAKE_BUILD_TYPE)
+endif(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE STREQUAL "Debug")
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
@@ -14,7 +14,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 #   3. try compiler options like -march=native or other architecture
 #      flags (the compiler does not always make the best configuration
 #      decisions without help)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -Wall -std=c++11 -Ofast -g -DEIGEN_FAST_MATH -march=native")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -funroll-loops -Wall -std=c++14 -Ofast -g -DEIGEN_FAST_MATH -march=native")
 
 enable_testing()
 
@@ -67,9 +67,11 @@ else()
 endif()
 
 if(BACKEND MATCHES "^eigen$")
-  set(WITH_EIGEN_BACKEND 1)
+  set(WITH_CUDA_BACKEND 0 CACHE INTERNAL "" FORCE)
+  set(WITH_EIGEN_BACKEND 1 CACHE INTERNAL "" FORCE)
 elseif(BACKEND MATCHES "^cuda$")
-  set(WITH_CUDA_BACKEND 1)
+  set(WITH_CUDA_BACKEND 1 CACHE INTERNAL "" FORCE)
+  set(WITH_EIGEN_BACKEND 0 CACHE INTERNAL "" FORCE)
 else()
   message(SEND_ERROR "BACKEND must be eigen or cuda")
 endif()
@@ -97,8 +99,12 @@ set(LIBS ${LIBS} ${CMAKE_THREAD_LIBS_INIT})
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+option(CNN_CORE_ONLY "If off, won't build extra dirs like tests and examples" ON)
+
 add_subdirectory(cnn)
-add_subdirectory(tests)
-add_subdirectory(examples)
-add_subdirectory(rnnlm)
-enable_testing()
+if(NOT CNN_CORE_ONLY)
+    add_subdirectory(tests)
+    add_subdirectory(examples)
+    add_subdirectory(rnnlm)
+    enable_testing()
+endif(NOT CNN_CORE_ONLY)

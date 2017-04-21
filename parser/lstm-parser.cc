@@ -300,9 +300,11 @@ void LSTMParser::DoAction(unsigned action, TaggerState* state,
     real_state->stack.pop_back();
     real_state->stacki.pop_back();
     // composed = cbias + H * head + D * dep + R * relation
-    Expression composed = affine_transform({GetParamExpr(p_cbias),
-        GetParamExpr(p_H), head, GetParamExpr(p_D), dep, GetParamExpr(p_R),
-        relation});
+    Expression composed = affine_transform(
+        {GetParamExpr(p_cbias),
+         GetParamExpr(p_H), head,
+         GetParamExpr(p_D), dep,
+         GetParamExpr(p_R), relation});
     Expression nlcomposed = tanh(composed);
     stack_lstm.rewind_one_step();
     stack_lstm.rewind_one_step();
@@ -358,7 +360,8 @@ NeuralTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
       args.push_back(GetParamExpr(p_t2l));
       args.push_back(t);
     }
-    state->buffer[sent.size() - added_to_buffer] = rectify(affine_transform(args));
+    state->buffer[sent.size() - added_to_buffer] = rectify(
+        affine_transform(args));
     state->bufferi[sent.size() - added_to_buffer] = token_index;
     added_to_buffer++;
   }

@@ -71,7 +71,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
     bool training,
     const vector<unsigned>& correct_actions, double* correct,
-    vector<Expression>* states_to_expose) {
+    map<string, Expression>* states_to_expose) {
   if (training)
     assert(!correct_actions.empty());
   assert(finalized);
@@ -83,8 +83,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
   }
 
   unique_ptr<TaggerState> state(
-      InitializeParserState(cg, raw_sent, sent, correct_actions,
-                            states_to_expose));
+      InitializeParserState(cg, raw_sent, sent, correct_actions));
 
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction

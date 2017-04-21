@@ -257,8 +257,7 @@ protected:
   virtual TaggerState* InitializeParserState(
       cnn::ComputationGraph* cg, const Sentence& raw_sent,
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-      const std::vector<unsigned>& correct_actions,
-      std::vector<cnn::expr::Expression>* states_to_expose) override;
+      const std::vector<unsigned>& correct_actions) override;
 
   virtual void InitializeNetworkParameters() override;
 
@@ -275,7 +274,7 @@ protected:
 
   virtual void DoAction(
       unsigned action, TaggerState* state, cnn::ComputationGraph* cg,
-      std::vector<cnn::expr::Expression>* states_to_expose) override;
+      std::map<std::string, cnn::expr::Expression>* states_to_expose) override;
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {

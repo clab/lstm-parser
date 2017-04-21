@@ -24,9 +24,11 @@ public:
 
   // Used for testing. Replaces OOV with UNK.
   std::vector<unsigned> LogProbTagger(
-      cnn::ComputationGraph *cg, const Sentence& sentence,
+      cnn::ComputationGraph *cg,
+      const Sentence& sentence,
       bool replace_unknowns = true,
-      std::vector<cnn::expr::Expression>* states_to_expose = nullptr) {
+      std::map<std::string, cnn::expr::Expression>* states_to_expose =
+          nullptr) {
     return LogProbTagger(
         cg, sentence,
         replace_unknowns ? ReplaceUnknowns(sentence) : sentence.words,
@@ -46,7 +48,7 @@ public:
       bool training = false,
       const std::vector<unsigned>& correct_actions = std::vector<unsigned>(),
       double* correct = nullptr,
-      std::vector<cnn::expr::Expression>* states_to_expose = nullptr);
+      std::map<std::string, cnn::expr::Expression>* states_to_expose = nullptr);
 
   const CorpusVocabulary& GetVocab() const { return vocab; }
 
@@ -79,8 +81,7 @@ protected:
   virtual TaggerState* InitializeParserState(
       cnn::ComputationGraph* hg, const Sentence& raw_sent,
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-      const std::vector<unsigned>& correct_actions,
-      std::vector<cnn::expr::Expression>* states_to_expose) = 0;
+      const std::vector<unsigned>& correct_actions) = 0;
 
   virtual cnn::expr::Expression GetActionProbabilities(
       const TaggerState& state) = 0;
@@ -92,7 +93,7 @@ protected:
 
   virtual void DoAction(
       unsigned action, TaggerState* state, cnn::ComputationGraph* cg,
-      std::vector<cnn::expr::Expression>* states_to_expose) = 0;
+      std::map<std::string, cnn::expr::Expression>* states_to_expose) = 0;
 
   virtual void DoSave(eos::portable_oarchive& archive) = 0;
 

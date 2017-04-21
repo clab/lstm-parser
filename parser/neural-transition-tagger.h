@@ -26,11 +26,11 @@ public:
   std::vector<unsigned> LogProbTagger(
       cnn::ComputationGraph *cg, const Sentence& sentence,
       bool replace_unknowns = true,
-      cnn::expr::Expression* final_parser_state = nullptr) {
+      std::vector<cnn::expr::Expression>* states_to_expose = nullptr) {
     return LogProbTagger(
         cg, sentence,
         replace_unknowns ? ReplaceUnknowns(sentence) : sentence.words,
-        false, std::vector<unsigned>(), nullptr, final_parser_state);
+        false, std::vector<unsigned>(), nullptr, states_to_expose);
   }
 
   // *** if correct_actions is empty, this runs greedy decoding ***
@@ -46,7 +46,7 @@ public:
       bool training = false,
       const std::vector<unsigned>& correct_actions = std::vector<unsigned>(),
       double* correct = nullptr,
-      cnn::expr::Expression* final_parser_state = nullptr);
+      std::vector<cnn::expr::Expression>* states_to_expose = nullptr);
 
   const CorpusVocabulary& GetVocab() const { return vocab; }
 
@@ -79,7 +79,8 @@ protected:
   virtual TaggerState* InitializeParserState(
       cnn::ComputationGraph* hg, const Sentence& raw_sent,
       const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-      const std::vector<unsigned>& correct_actions) = 0;
+      const std::vector<unsigned>& correct_actions,
+      std::vector<cnn::expr::Expression>* states_to_expose) = 0;
 
   virtual cnn::expr::Expression GetActionProbabilities(
       const TaggerState& state) = 0;
@@ -89,8 +90,9 @@ protected:
   virtual bool IsActionForbidden(const unsigned action,
                                  const TaggerState& state) const = 0;
 
-  virtual void DoAction(unsigned action, TaggerState* state,
-                        cnn::ComputationGraph* cg) = 0;
+  virtual void DoAction(
+      unsigned action, TaggerState* state, cnn::ComputationGraph* cg,
+      std::vector<cnn::expr::Expression>* states_to_expose) = 0;
 
   virtual void DoSave(eos::portable_oarchive& archive) = 0;
 

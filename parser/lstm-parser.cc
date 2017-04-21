@@ -236,7 +236,8 @@ Expression LSTMParser::GetActionProbabilities(const TaggerState& state) {
 
 
 void LSTMParser::DoAction(unsigned action, TaggerState* state,
-                          ComputationGraph* cg) {
+                          ComputationGraph* cg,
+                          vector<Expression>* states_to_expose) {
   ParserState* real_state = static_cast<ParserState*>(state);
   // add current action to action LSTM
   Expression action_e = lookup(*cg, p_a, action);
@@ -309,6 +310,11 @@ void LSTMParser::DoAction(unsigned action, TaggerState* state,
     real_state->stack.push_back(nlcomposed);
     real_state->stacki.push_back(headi);
   }
+
+  // After the last action, record the final tree state, if requested.
+  if (states_to_expose && ShouldTerminate(*real_state)) {
+    (*states_to_expose).back() = real_state->stack.back();
+  }
 }
 
 
@@ -316,7 +322,8 @@ NeuralTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
     ComputationGraph* cg,
     const Sentence& raw_sent,
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
-    const vector<unsigned>& correct_actions) {
+    const vector<unsigned>& correct_actions,
+    vector<Expression>* states_to_expose) {
   stack_lstm.new_graph(*cg);
   buffer_lstm.new_graph(*cg);
   action_lstm.new_graph(*cg);
@@ -361,6 +368,10 @@ NeuralTransitionTagger::TaggerState* LSTMParser::InitializeParserState(
   state->bufferi[0] = -999;
   for (auto& b : state->buffer)
     buffer_lstm.add_input(b);
+
+  if (states_to_expose) {
+    states_to_expose->resize(1);
+  }
 
   return state;
 }

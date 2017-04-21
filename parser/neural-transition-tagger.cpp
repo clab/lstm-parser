@@ -71,7 +71,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
     bool training,
     const vector<unsigned>& correct_actions, double* correct,
-    Expression* final_parser_state) {
+    vector<Expression>* states_to_expose) {
   if (training)
     assert(!correct_actions.empty());
   assert(finalized);
@@ -82,8 +82,9 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     param_expressions[params] = parameter(*cg, params);
   }
 
-  unique_ptr<TaggerState> state(InitializeParserState(cg, raw_sent, sent,
-                                                      correct_actions));
+  unique_ptr<TaggerState> state(
+      InitializeParserState(cg, raw_sent, sent, correct_actions,
+                            states_to_expose));
 
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction
@@ -125,15 +126,12 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     log_probs.push_back(pick(adiste, action));
     results.push_back(action);
 
-    DoAction(action, state.get(), cg);
+    DoAction(action, state.get(), cg, states_to_expose);
   }
 
   Expression tot_neglogprob = -sum(log_probs);
   assert(tot_neglogprob.pg != nullptr);
 
-  if (final_parser_state) {
-    *final_parser_state = p_t;
-  }
   param_expressions.clear();
   return results;
 }

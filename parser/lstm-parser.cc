@@ -311,6 +311,11 @@ void LSTMParser::DoAction(unsigned action, TaggerState* state,
     stack_lstm.add_input(nlcomposed);
     real_state->stack.push_back(nlcomposed);
     real_state->stacki.push_back(headi);
+    if (states_to_expose) {
+      // Once something is attached as a dependent, it will never again be
+      // modified, so cache its expression.
+      (*states_to_expose)[to_string(depi)] = dep;
+    }
   }
 
   // After the last action, record the final tree state, if requested.

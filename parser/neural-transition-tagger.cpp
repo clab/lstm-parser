@@ -72,6 +72,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     bool training,
     const vector<unsigned>& correct_actions, double* correct,
     map<string, Expression>* states_to_expose) {
+  in_training = training;
   if (training)
     assert(!correct_actions.empty());
   assert(finalized);

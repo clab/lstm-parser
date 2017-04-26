@@ -17,7 +17,8 @@ namespace lstm_parser {
 
 class NeuralTransitionTagger {
 public:
-  NeuralTransitionTagger() : finalized(false), model(new cnn::Model) {}
+  NeuralTransitionTagger() : finalized(false), in_training(false),
+                             model(new cnn::Model) {}
   virtual ~NeuralTransitionTagger() {}
 
   void FinalizeVocab();
@@ -66,6 +67,7 @@ protected:
   };
 
   bool finalized;
+  bool in_training;  // expose to virtual fns whether we're doing training
   std::map<cnn::Parameters*, cnn::expr::Expression> param_expressions;
 
   // Store the model as a smart ptr so we can call its destructor when needed.

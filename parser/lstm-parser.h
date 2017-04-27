@@ -323,7 +323,7 @@ private:
     action_lstm = cnn::LSTMBuilder(options.layers, options.action_dim,
                                    options.hidden_dim, model.get());
 
-    FinalizeVocab(); // OK, now finalize. :)
+    FinalizeVocab(); // OK, now finalize. :) (Also initializes network params.)
 
     ar & *model;
   }

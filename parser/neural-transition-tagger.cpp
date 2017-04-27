@@ -51,6 +51,7 @@ void NeuralTransitionTagger::FinalizeVocab() {
   finalized = true;
 }
 
+
 Sentence::SentenceMap NeuralTransitionTagger::ReplaceUnknowns(
     const Sentence& sentence) {
   Sentence::SentenceMap tsentence(sentence.words);  // sentence w/ OOVs replaced
@@ -135,7 +136,6 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
   param_expressions.clear();
   return results;
 }
-
 
 
 } /* namespace lstm_parser */

@@ -191,17 +191,20 @@ public:
 class Sentence;
 inline std::ostream& operator<<(std::ostream& os, const Sentence& sentence);
 
+class ParseTree;  // forward declaration
+
 class Sentence {
 public:
   typedef std::map<unsigned, unsigned> SentenceMap;
   typedef std::map<unsigned, std::string> SentenceUnkMap;
 
-  Sentence(const CorpusVocabulary& vocab) : vocab(vocab) {}
+  Sentence(const CorpusVocabulary& vocab) : vocab(vocab), tree(nullptr) {}
 
   SentenceMap words;
   SentenceMap poses;
   SentenceUnkMap unk_surface_forms;
   const CorpusVocabulary& vocab;
+  ParseTree* tree;
 
   size_t Size() const {
     return words.size();

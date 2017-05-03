@@ -114,7 +114,7 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     unsigned action = best_a;
 
     if (!correct_actions.empty()) {
-      assert(action_count < correct_actions.size());
+      assert(action_count < correct_actions.size() || !training);
       unsigned correct_action = correct_actions[action_count];
       if (correct && best_a == correct_action) {
         (*correct)++;

@@ -61,6 +61,7 @@ struct LookupParameters : public ParametersBase {
   void squared_l2norm(float* sqnorm) const override;
   void g_squared_l2norm(float* sqnorm) const override;
   size_t size() const override;
+  size_t num_values() const { return values.size(); }
   void Initialize(unsigned index, const std::vector<float>& val);
 
   void copy(const LookupParameters & val);

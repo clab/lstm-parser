@@ -86,12 +86,12 @@ protected:
       const std::vector<unsigned>& correct_actions) = 0;
 
   virtual cnn::expr::Expression GetActionProbabilities(
-      const TaggerState& state) = 0;
+      TaggerState* state) = 0;
 
-  virtual bool ShouldTerminate(const TaggerState& state) const = 0;
+  virtual bool ShouldTerminate(TaggerState* state) const = 0;
 
   virtual bool IsActionForbidden(const unsigned action,
-                                 const TaggerState& state) const = 0;
+                                 TaggerState* state) const = 0;
 
   virtual void DoAction(
       unsigned action, TaggerState* state, cnn::ComputationGraph* cg,

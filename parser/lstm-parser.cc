@@ -137,9 +137,9 @@ LSTMParser::LSTMParser(const ParserOptions& poptions,
 
 
 bool LSTMParser::IsActionForbidden(const unsigned action,
-                                   const TaggerState& state) const {
+                                   TaggerState* state) const {
   const string& action_name = vocab.action_names[action];
-  const ParserState& real_state = static_cast<const ParserState&>(state);
+  const ParserState& real_state = static_cast<const ParserState&>(*state);
   unsigned ssize = real_state.stack.size();
   unsigned bsize = real_state.buffer.size();
 
@@ -221,7 +221,7 @@ ParseTree LSTMParser::RecoverParseTree(
 }
 
 
-Expression LSTMParser::GetActionProbabilities(const TaggerState& state) {
+Expression LSTMParser::GetActionProbabilities(TaggerState* state) {
   // p_t = pbias + S * slstm + B * blstm + A * alstm
   Expression p_t = affine_transform(
       {GetParamExpr(p_pbias), GetParamExpr(p_S), stack_lstm.back(),
@@ -319,7 +319,7 @@ void LSTMParser::DoAction(unsigned action, TaggerState* state,
   }
 
   // After the last action, record the final tree state, if requested.
-  if (states_to_expose && ShouldTerminate(*real_state)) {
+  if (states_to_expose && ShouldTerminate(real_state)) {
     (*states_to_expose)["Tree"] = real_state->stack.back();
   }
 }

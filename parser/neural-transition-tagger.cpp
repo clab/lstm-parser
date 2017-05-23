@@ -90,16 +90,16 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction
   Expression p_t; // declared outside to allow access later
-  while (!ShouldTerminate(*state)) {
+  while (!ShouldTerminate(state.get())) {
     // Get list of possible actions for the current parser state.
     vector<unsigned> current_valid_actions;
     for (unsigned action = 0; action < vocab.action_names.size(); ++action) {
-      if (IsActionForbidden(action, *state))
+      if (IsActionForbidden(action, state.get()))
         continue;
       current_valid_actions.push_back(action);
     }
 
-    Expression r_t = GetActionProbabilities(*state);
+    Expression r_t = GetActionProbabilities(state.get());
     // adist = log_softmax(r_t, current_valid_actions)
     Expression adiste = log_softmax(r_t, current_valid_actions);
     vector<float> adist = as_vector(cg->incremental_forward());

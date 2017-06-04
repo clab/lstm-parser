@@ -54,7 +54,7 @@ public:
   inline unsigned GetWord(const std::string& word) const {
     auto word_iter = words_to_int.find(word);
     if (word_iter == words_to_int.end()) {
-      return words_to_int.find(CorpusVocabulary::UNK)->second;
+      return kUNK;
     } else {
       return word_iter->second;
     }
@@ -198,12 +198,12 @@ public:
   typedef std::map<unsigned, unsigned> SentenceMap;
   typedef std::map<unsigned, std::string> SentenceUnkMap;
 
-  Sentence(const CorpusVocabulary& vocab) : vocab(vocab), tree(nullptr) {}
+  Sentence(const CorpusVocabulary& vocab) : vocab(&vocab), tree(nullptr) {}
 
   SentenceMap words;
   SentenceMap poses;
   SentenceUnkMap unk_surface_forms;
-  const CorpusVocabulary& vocab;
+  const CorpusVocabulary* vocab;
   ParseTree* tree;
 
   size_t Size() const {
@@ -212,8 +212,8 @@ public:
 
   const std::string& WordForToken(unsigned token_id) const {
     unsigned word_id = words.at(token_id);
-    return word_id == vocab.kUNK ? unk_surface_forms.at(token_id)
-                                 : vocab.int_to_words[word_id];
+    return word_id == vocab->kUNK ? unk_surface_forms.at(token_id)
+                                  : vocab->int_to_words[word_id];
   }
 };
 
@@ -224,8 +224,8 @@ inline std::ostream& operator<<(std::ostream& os, const Sentence& sentence) {
     unsigned pos_id = sentence.poses.at(index);
     auto unk_iter = sentence.unk_surface_forms.find(index);
     os << (unk_iter == sentence.unk_surface_forms.end() ?
-            sentence.vocab.int_to_words.at(word_id) : unk_iter->second)
-       << '/' << sentence.vocab.int_to_pos.at(pos_id);
+            sentence.vocab->int_to_words.at(word_id) : unk_iter->second)
+       << '/' << sentence.vocab->int_to_pos.at(pos_id);
     if (index != sentence.words.rend()->first) {
       os << ' ';
     }
@@ -350,5 +350,12 @@ private:
 };
 
 } // namespace lstm_parser
+
+
+inline void swap(lstm_parser::Sentence& s1, lstm_parser::Sentence& s2) {
+  lstm_parser::Sentence tmp = std::move(s1);
+  s2 = std::move(s1);
+  s1 = std::move(tmp);
+}
 
 #endif

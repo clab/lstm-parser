@@ -23,7 +23,7 @@ void NeuralTransitionTagger::SaveModel(const string& model_fname,
   cerr << "Model saved." << endl;
   // Create a soft link to the most recent model in order to make it
   // easier to refer to it in a shell script.
-  if (!softlink_created) {
+  if (false) {
     string softlink = "latest_model.params";
 
     if (system((string("rm -f ") + softlink).c_str()) == 0

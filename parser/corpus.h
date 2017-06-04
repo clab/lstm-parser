@@ -354,8 +354,8 @@ private:
 
 inline void swap(lstm_parser::Sentence& s1, lstm_parser::Sentence& s2) {
   lstm_parser::Sentence tmp = std::move(s1);
-  s2 = std::move(s1);
-  s1 = std::move(tmp);
+  s1 = std::move(s2);
+  s2 = std::move(tmp);
 }
 
 #endif

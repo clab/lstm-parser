@@ -2,29 +2,25 @@
 #include <algorithm>
 #include <sstream>
 #include <iostream>
-#include <vector>
-#include <limits>
-#include <cmath>
 #include <chrono>
-#include <ctime>
 
 #include <unordered_map>
 #include <unordered_set>
 
-#include <execinfo.h>
 #include <unistd.h>
 #include <signal.h>
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/archive/text_oarchive.hpp>
 #include <boost/archive/text_iarchive.hpp>
+#include <boost/iostreams/filter/zlib.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 #include <boost/program_options.hpp>
 
 #include "cnn/training.h"
 #include "cnn/cnn.h"
 #include "cnn/expr.h"
-#include "cnn/nodes.h"
 #include "cnn/lstm.h"
-#include "cnn/rnn.h"
 #include "c2.h"
 
 cpyp::Corpus corpus;
@@ -74,6 +70,8 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
         ("rel_dim", po::value<unsigned>()->default_value(10), "relation dimension")
         ("lstm_input_dim", po::value<unsigned>()->default_value(60), "LSTM input dimension")
         ("train,t", "Should training be run?")
+        ("maxit,M", po::value<unsigned>()->default_value(8000), "Maximum number of training iterations")
+        ("tolerance", po::value<double>()->default_value(-1.0), "Tolerance on dev uas for stopping training")
         ("words,w", po::value<string>(), "Pretrained word embeddings")
         ("help,h", "Help");
   po::options_description dcmdline_options;
@@ -429,7 +427,8 @@ void signal_callback_handler(int /* signum */) {
   requested_stop = true;
 }
 
-unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp, unsigned len) {
+template<typename T>
+unsigned compute_correct(const map<int,T>& ref, const map<int,T>& hyp, unsigned len) {
   unsigned res = 0;
   for (unsigned i = 0; i < len; ++i) {
     auto ri = ref.find(i);
@@ -441,20 +440,38 @@ unsigned compute_correct(const map<int,int>& ref, const map<int,int>& hyp, unsig
   return res;
 }
 
+template<typename T1, typename T2>
+unsigned compute_correct(const map<int,T1>& ref1, const map<int,T1>& hyp1,
+                         const map<int,T2>& ref2, const map<int,T2>& hyp2, unsigned len) {
+  unsigned res = 0;
+  for (unsigned i = 0; i < len; ++i) {
+    auto r1 = ref1.find(i);
+    auto h1 = hyp1.find(i);
+    auto r2 = ref2.find(i);
+    auto h2 = hyp2.find(i);
+    assert(r1 != ref1.end());
+    assert(h1 != hyp1.end());
+    assert(r2 != ref2.end());
+    assert(h2 != hyp2.end());
+    if (r1->second == h1->second && r2->second == h2->second) ++res;
+  }
+  return res;
+}
+
 void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
-                  const vector<string>& sentenceUnkStrings, 
-                  const map<unsigned, string>& intToWords, 
-                  const map<unsigned, string>& intToPos, 
+                  const vector<string>& sentenceUnkStrings,
+                  const map<unsigned, string>& intToWords,
+                  const map<unsigned, string>& intToPos,
                   const map<int,int>& hyp, const map<int,string>& rel_hyp) {
   for (unsigned i = 0; i < (sentence.size()-1); ++i) {
     auto index = i + 1;
-    assert(i < sentenceUnkStrings.size() && 
+    assert(i < sentenceUnkStrings.size() &&
            ((sentence[i] == corpus.get_or_add_word(cpyp::Corpus::UNK) &&
              sentenceUnkStrings[i].size() > 0) ||
             (sentence[i] != corpus.get_or_add_word(cpyp::Corpus::UNK) &&
              sentenceUnkStrings[i].size() == 0 &&
              intToWords.find(sentence[i]) != intToWords.end())));
-    string wit = (sentenceUnkStrings[i].size() > 0)? 
+    string wit = (sentenceUnkStrings[i].size() > 0)?
       sentenceUnkStrings[i] : intToWords.find(sentence[i])->second;
     auto pit = intToPos.find(pos[i]);
     assert(hyp.find(i) != hyp.end());
@@ -466,10 +483,10 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
     size_t first_char_in_rel = hyp_rel.find('(') + 1;
     size_t last_char_in_rel = hyp_rel.rfind(')') - 1;
     hyp_rel = hyp_rel.substr(first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
-    cout << index << '\t'       // 1. ID 
+    cout << index << '\t'       // 1. ID
          << wit << '\t'         // 2. FORM
-         << "_" << '\t'         // 3. LEMMA 
-         << "_" << '\t'         // 4. CPOSTAG 
+         << "_" << '\t'         // 3. LEMMA
+         << "_" << '\t'         // 4. CPOSTAG
          << pit->second << '\t' // 5. POSTAG
          << "_" << '\t'         // 6. FEATS
          << hyp_head << '\t'    // 7. HEAD
@@ -480,11 +497,26 @@ void output_conll(const vector<unsigned>& sentence, const vector<unsigned>& pos,
   cout << endl;
 }
 
+void init_pretrained(istream &in) {
+  string line;
+  vector<float> v(PRETRAINED_DIM, 0);
+  string word;
+  while (getline(in, line)) {
+    if (word.empty() && line.find('.') == std::string::npos)
+      continue; // first line contains vocabulary size and dimensions
+    istringstream lin(line);
+    lin >> word;
+    for (unsigned i = 0; i < PRETRAINED_DIM; ++i) lin >> v[i];
+    unsigned id = corpus.get_or_add_word(word);
+    pretrained[id] = v;
+  }
+}
+
 
 int main(int argc, char** argv) {
   cnn::Initialize(argc, argv);
 
-  cerr << "COMMAND:"; 
+  cerr << "COMMAND:";
   for (unsigned i = 0; i < static_cast<unsigned>(argc); ++i) cerr << ' ' << argv[i];
   cerr << endl;
   unsigned status_every_i_iterations = 100;
@@ -510,6 +542,12 @@ int main(int argc, char** argv) {
   }
   const double unk_prob = conf["unk_prob"].as<double>();
   assert(unk_prob >= 0.); assert(unk_prob <= 1.);
+  const unsigned maxit = conf["maxit"].as<unsigned>();
+  cerr << "Maximum number of iterations: " << maxit << "\n";
+  const double tolerance = conf["tolerance"].as<double>();
+  if (tolerance > 0.0) {
+    cerr << "Optimization tolerance: " << tolerance << "\n";
+  }
   ostringstream os;
   os << "parser_" << (USE_POS ? "pos" : "nopos")
      << '_' << LAYERS
@@ -524,24 +562,24 @@ int main(int argc, char** argv) {
   const string fname = os.str();
   cerr << "Writing parameters to file: " << fname << endl;
   bool softlinkCreated = false;
-  corpus.load_correct_actions(conf["training_data"].as<string>());	
+  corpus.load_correct_actions(conf["training_data"].as<string>());
   const unsigned kUNK = corpus.get_or_add_word(cpyp::Corpus::UNK);
   kROOT_SYMBOL = corpus.get_or_add_word(ROOT_SYMBOL);
 
   if (conf.count("words")) {
     pretrained[kUNK] = vector<float>(PRETRAINED_DIM, 0);
-    cerr << "Loading from " << conf["words"].as<string>() << " with" << PRETRAINED_DIM << " dimensions\n";
-    ifstream in(conf["words"].as<string>().c_str());
-    string line;
-    getline(in, line);
-    vector<float> v(PRETRAINED_DIM, 0);
-    string word;
-    while (getline(in, line)) {
-      istringstream lin(line);
-      lin >> word;
-      for (unsigned i = 0; i < PRETRAINED_DIM; ++i) lin >> v[i];
-      unsigned id = corpus.get_or_add_word(word);
-      pretrained[id] = v;
+    const string& words_fname = conf["words"].as<string>();
+    cerr << "Loading from " << words_fname << " with " << PRETRAINED_DIM << " dimensions\n";
+    if (boost::algorithm::ends_with(words_fname, ".gz")) {
+      ifstream file(words_fname.c_str(), ios_base::in | ios_base::binary);
+      boost::iostreams::filtering_streambuf<boost::iostreams::input> zip;
+      zip.push(boost::iostreams::zlib_decompressor());
+      zip.push(file);
+      istream in(&zip);
+      init_pretrained(in);
+    } else {
+      ifstream in(words_fname.c_str());
+      init_pretrained(in); // read as normal text
     }
   }
 
@@ -591,11 +629,13 @@ int main(int argc, char** argv) {
     double right = 0;
     double llh = 0;
     bool first = true;
-    int iter = -1;
+    unsigned iter = 0;
+    double uas = -1;
+    double prev_uas = -1;
     time_t time_start = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     cerr << "TRAINING STARTED AT: " << put_time(localtime(&time_start), "%c %Z") << endl;
-    while(!requested_stop) {
-      ++iter;
+    while(!requested_stop && iter < maxit &&
+        (tolerance < 0 || uas < 0 || prev_uas < 0 || abs(prev_uas - uas) > tolerance)) {
       for (unsigned sii = 0; sii < status_every_i_iterations; ++sii) {
            if (si == corpus.nsentences) {
              si = 0;
@@ -610,8 +650,8 @@ int main(int argc, char** argv) {
              for (auto& w : tsentence)
                if (singletons.count(w) && cnn::rand01() < unk_prob) w = kUNK;
            }
-	   const vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]]; 
-	   const vector<unsigned>& actions=corpus.correct_act_sent[order[si]];
+           const vector<unsigned>& sentencePos=corpus.sentencesPos[order[si]];
+           const vector<unsigned>& actions=corpus.correct_act_sent[order[si]];
            ComputationGraph hg;
            parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,actions,corpus.actions,corpus.intToWords,&right);
            double lp = as_scalar(hg.incremental_forward());
@@ -643,15 +683,15 @@ int main(int argc, char** argv) {
         auto t_start = std::chrono::high_resolution_clock::now();
         for (unsigned sii = 0; sii < dev_size; ++sii) {
            const vector<unsigned>& sentence=corpus.sentencesDev[sii];
-	   const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
-	   const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
+           const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii];
+           const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
            vector<unsigned> tsentence=sentence;
            for (auto& w : tsentence)
              if (training_vocab.count(w) == 0) w = kUNK;
 
            ComputationGraph hg;
-	   vector<unsigned> pred = parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,vector<unsigned>(),corpus.actions,corpus.intToWords,&right);
-	   double lp = 0;
+           vector<unsigned> pred = parser.log_prob_parser(&hg,sentence,tsentence,sentencePos,vector<unsigned>(),corpus.actions,corpus.intToWords,&right);
+           double lp = 0;
            llh -= lp;
            trs += actions.size();
            map<int,int> ref = parser.compute_heads(sentence.size(), actions, corpus.actions);
@@ -661,7 +701,9 @@ int main(int argc, char** argv) {
            total_heads += sentence.size() - 1;
         }
         auto t_end = std::chrono::high_resolution_clock::now();
-        cerr << "  **dev (iter=" << iter << " epoch=" << (tot_seen / corpus.nsentences) << ")\tllh=" << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: " << (correct_heads / total_heads) << "\t[" << dev_size << " sents in " << std::chrono::duration<double, std::milli>(t_end-t_start).count() << " ms]" << endl;
+        prev_uas = uas;
+        uas = correct_heads / total_heads;
+        cerr << "  **dev (iter=" << iter << " epoch=" << (tot_seen / corpus.nsentences) << ")\tllh=" << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: " << uas << "\t[" << dev_size << " sents in " << std::chrono::duration<double, std::milli>(t_end-t_start).count() << " ms]" << endl;
         if (correct_heads > best_correct_heads) {
           best_correct_heads = correct_heads;
           ofstream out(fname);
@@ -671,29 +713,36 @@ int main(int argc, char** argv) {
           // easier to refer to it in a shell script.
           if (!softlinkCreated) {
             string softlink = " latest_model";
-            if (system((string("rm -f ") + softlink).c_str()) == 0 && 
+            if (system((string("rm -f ") + softlink).c_str()) == 0 &&
                 system((string("ln -s ") + fname + softlink).c_str()) == 0) {
-              cerr << "Created " << softlink << " as a soft link to " << fname 
+              cerr << "Created " << softlink << " as a soft link to " << fname
                    << " for convenience." << endl;
             }
             softlinkCreated = true;
           }
         }
       }
+      ++iter;
+    }
+    if (iter >= maxit) {
+      cerr << "\nMaximum number of iterations reached (" << iter << "), terminating optimization...\n";
+    } else if (!requested_stop) {
+      cerr << "\nScore tolerance reached (" << tolerance << "), terminating optimization...\n";
     }
   } // should do training?
   if (true) { // do test evaluation
     double llh = 0;
     double trs = 0;
     double right = 0;
-    double correct_heads = 0;
+    double correct_heads_unlabeled = 0;
+    double correct_heads_labeled = 0;
     double total_heads = 0;
     auto t_start = std::chrono::high_resolution_clock::now();
     unsigned corpus_size = corpus.nsentencesDev;
     for (unsigned sii = 0; sii < corpus_size; ++sii) {
       const vector<unsigned>& sentence=corpus.sentencesDev[sii];
-      const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii]; 
-      const vector<string>& sentenceUnkStr=corpus.sentencesStrDev[sii]; 
+      const vector<unsigned>& sentencePos=corpus.sentencesPosDev[sii];
+      const vector<string>& sentenceUnkStr=corpus.sentencesStrDev[sii];
       const vector<unsigned>& actions=corpus.correct_act_sentDev[sii];
       vector<unsigned> tsentence=sentence;
       for (auto& w : tsentence)
@@ -708,11 +757,12 @@ int main(int argc, char** argv) {
       map<int,int> ref = parser.compute_heads(sentence.size(), actions, corpus.actions, &rel_ref);
       map<int,int> hyp = parser.compute_heads(sentence.size(), pred, corpus.actions, &rel_hyp);
       output_conll(sentence, sentencePos, sentenceUnkStr, corpus.intToWords, corpus.intToPos, hyp, rel_hyp);
-      correct_heads += compute_correct(ref, hyp, sentence.size() - 1);
+      correct_heads_unlabeled += compute_correct(ref, hyp, sentence.size() - 1);
+      correct_heads_labeled += compute_correct(ref, hyp, rel_ref, rel_hyp, sentence.size() - 1);
       total_heads += sentence.size() - 1;
     }
     auto t_end = std::chrono::high_resolution_clock::now();
-    cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: " << (correct_heads / total_heads) << "\t[" << corpus_size << " sents in " << std::chrono::duration<double, std::milli>(t_end-t_start).count() << " ms]" << endl;
+    cerr << "TEST llh=" << llh << " ppl: " << exp(llh / trs) << " err: " << (trs - right) / trs << " uas: " << (correct_heads_unlabeled / total_heads) << " las: " << (correct_heads_labeled / total_heads) << "\t[" << corpus_size << " sents in " << std::chrono::duration<double, std::milli>(t_end-t_start).count() << " ms]" << endl;
   }
   for (unsigned i = 0; i < corpus.actions.size(); ++i) {
     //cerr << corpus.actions[i] << '\t' << parser.p_r->values[i].transpose() << endl;

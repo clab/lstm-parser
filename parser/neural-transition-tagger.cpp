@@ -14,9 +14,12 @@ using namespace cnn::expr;
 
 namespace lstm_parser {
 
+const cnn::expr::Expression NeuralTransitionTagger::USE_ORACLE(
+    nullptr, cnn::VariableIndex(static_cast<unsigned>(-1)));
+
 
 void NeuralTransitionTagger::SaveModel(const string& model_fname,
-                                     bool softlink_created) {
+                                       bool softlink_created) {
   ofstream out_file(model_fname);
   eos::portable_oarchive archive(out_file);
   DoSave(archive);
@@ -99,31 +102,38 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
     }
 
     Expression r_t = GetActionProbabilities(state.get());
-    // adist = log_softmax(r_t, current_valid_actions)
-    Expression adiste = log_softmax(r_t, current_valid_actions);
-    vector<float> adist = as_vector(cg->incremental_forward());
-    double best_score = adist[current_valid_actions[0]];
-    unsigned best_a = current_valid_actions[0];
-    for (unsigned i = 1; i < current_valid_actions.size(); ++i) {
-      if (adist[current_valid_actions[i]] > best_score) {
-        best_score = adist[current_valid_actions[i]];
-        best_a = current_valid_actions[i];
+    unsigned action;
+    if (r_t.pg == USE_ORACLE.pg && r_t.i == USE_ORACLE.i) {
+      assert(!correct_actions.empty() && action_count < correct_actions.size());
+      action = correct_actions[action_count];
+      // cerr << "Using oracle action: " << vocab.action_names[action] << endl;
+    } else {
+      // adist = log_softmax(r_t, current_valid_actions)
+      Expression adiste = log_softmax(r_t, current_valid_actions);
+      vector<float> adist = as_vector(cg->incremental_forward());
+      double best_score = adist[current_valid_actions[0]];
+      unsigned best_a = current_valid_actions[0];
+      for (unsigned i = 1; i < current_valid_actions.size(); ++i) {
+        if (adist[current_valid_actions[i]] > best_score) {
+          best_score = adist[current_valid_actions[i]];
+          best_a = current_valid_actions[i];
+        }
       }
-    }
-    unsigned action = best_a;
+      action = best_a;
 
-    if (!correct_actions.empty()) {
-      assert(action_count < correct_actions.size() || !training);
-      unsigned correct_action = correct_actions[action_count];
-      if (correct && best_a == correct_action) {
-        (*correct)++;
+      if (!correct_actions.empty()) {
+        assert(action_count < correct_actions.size() || !training);
+        unsigned correct_action = correct_actions[action_count];
+        if (correct && best_a == correct_action) {
+          (*correct)++;
+        }
+        // If we're training, use the reference action.
+        if (training)
+          action = correct_action;
       }
-      // If we're training, use the reference action.
-      if (training)
-        action = correct_action;
+      log_probs.push_back(pick(adiste, action));
     }
     ++action_count;
-    log_probs.push_back(pick(adiste, action));
     results.push_back(action);
 
     DoAction(action, state.get(), cg, states_to_expose);

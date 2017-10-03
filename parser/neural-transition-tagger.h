@@ -66,6 +66,10 @@ protected:
     virtual ~TaggerState() {}
   };
 
+  // Special network pseudo-node for signaling that an oracle action should
+  // be used.
+  static const cnn::expr::Expression USE_ORACLE;
+
   bool finalized;
   bool in_training;  // expose to virtual fns whether we're doing training
   std::map<cnn::Parameters*, cnn::expr::Expression> param_expressions;

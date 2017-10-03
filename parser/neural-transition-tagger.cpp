@@ -89,7 +89,6 @@ vector<unsigned> NeuralTransitionTagger::LogProbTagger(
 
   vector<Expression> log_probs;
   unsigned action_count = 0;  // incremented at each prediction
-  Expression p_t; // declared outside to allow access later
   while (!ShouldTerminate(state.get())) {
     // Get list of possible actions for the current parser state.
     vector<unsigned> current_valid_actions;

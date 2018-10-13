@@ -198,6 +198,9 @@ public:
   typedef std::map<unsigned, unsigned> SentenceMap;
   typedef std::map<unsigned, std::string> SentenceUnkMap;
 
+  // TODO: move correct_act_sent from corpus-level to here
+  struct SentenceMetadata {};
+
   Sentence(const CorpusVocabulary& vocab) : vocab(&vocab), tree(nullptr) {}
 
   SentenceMap words;
@@ -205,6 +208,7 @@ public:
   SentenceUnkMap unk_surface_forms;
   const CorpusVocabulary* vocab;
   ParseTree* tree;
+  std::unique_ptr<SentenceMetadata> metadata;
 
   size_t Size() const {
     return words.size();

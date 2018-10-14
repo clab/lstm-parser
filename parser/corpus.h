@@ -189,7 +189,7 @@ public:
 
 
 class Sentence;
-inline std::ostream& operator<<(std::ostream& os, const Sentence& sentence);
+inline std::ostream& operator<<(std::ostream& os, const Sentence& sent);
 
 class ParseTree;  // forward declaration
 
@@ -221,16 +221,17 @@ public:
   }
 };
 
-inline std::ostream& operator<<(std::ostream& os, const Sentence& sentence) {
-  for (auto &index_and_word_id : sentence.words) {
+inline std::ostream& operator<<(std::ostream& os, const Sentence& sent) {
+  for (auto &index_and_word_id : sent.words) {
     unsigned index = index_and_word_id.first;
     unsigned word_id = index_and_word_id.second;
-    unsigned pos_id = sentence.poses.at(index);
-    auto unk_iter = sentence.unk_surface_forms.find(index);
-    os << (unk_iter == sentence.unk_surface_forms.end() ?
-            sentence.vocab->int_to_words.at(word_id) : unk_iter->second)
-       << '/' << sentence.vocab->int_to_pos.at(pos_id);
-    if (index != sentence.words.rend()->first) {
+    unsigned pos_id = sent.poses.at(index);
+    auto unk_iter = sent.unk_surface_forms.find(index);
+    os << (unk_iter == sent.unk_surface_forms.end() || unk_iter->second == ""
+            ? sent.vocab->int_to_words.at(word_id)
+            : unk_iter->second)
+       << '/' << sent.vocab->int_to_pos.at(pos_id);
+    if (index != sent.words.rend()->first) {
       os << ' ';
     }
   }

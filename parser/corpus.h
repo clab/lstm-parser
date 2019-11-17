@@ -299,7 +299,8 @@ protected:
     void RecordSentence(TrainingCorpus* corpus, Sentence::SentenceMap* words,
                         Sentence::SentenceMap* sentence_pos,
                         Sentence::SentenceUnkMap* sentence_unk_surface_forms,
-                        std::vector<unsigned>* correct_actions) const;
+                        std::vector<unsigned>* correct_actions,
+                        Sentence::SentenceMetadata* metadata = nullptr) const;
 
     static inline unsigned UTF8Len(unsigned char x) {
       if (x < 0x80) return 1;

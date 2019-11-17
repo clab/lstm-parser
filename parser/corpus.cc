@@ -185,12 +185,14 @@ void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
     TrainingCorpus* corpus, Sentence::SentenceMap* words,
     Sentence::SentenceMap* sentence_pos,
     Sentence::SentenceUnkMap* sentence_unk_surface_forms,
-    vector<unsigned>* correct_actions) const {
+    vector<unsigned>* correct_actions,
+    Sentence::SentenceMetadata* metadata) const {
   // Store the sentence variables and clear them for the next sentence.
   corpus->sentences.emplace_back(*corpus->vocab);
   Sentence* sentence = &corpus->sentences.back();
   sentence->words.swap(*words);
   sentence->poses.swap(*sentence_pos);
+  sentence->metadata.reset(metadata);
   corpus->correct_act_sent.push_back({});
   corpus->correct_act_sent.back().swap(*correct_actions);
 

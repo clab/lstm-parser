@@ -1,5 +1,6 @@
 #include "neural-transition-tagger.h"
 
+#include <boost/filesystem.hpp>
 #include <fstream>
 #include <string>
 #include <memory>
@@ -20,6 +21,12 @@ const cnn::expr::Expression NeuralTransitionTagger::USE_ORACLE(
 
 void NeuralTransitionTagger::SaveModel(const string& model_fname,
                                        bool softlink_created) {
+  boost::filesystem::path model_dir_path(model_fname);
+  model_dir_path.remove_filename();
+  if (boost::filesystem::create_directories(model_dir_path)) {
+    cerr << "Created directory " << model_dir_path << endl;
+  }
+
   ofstream out_file(model_fname);
   eos::portable_oarchive archive(out_file);
   DoSave(archive);

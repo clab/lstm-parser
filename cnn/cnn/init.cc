@@ -30,7 +30,7 @@ static void RemoveArgs(int& argc, char**& argv, int& argi, int n) {
   assert(argc >= 0);
 }
 
-void Initialize(int& argc, char**& argv, unsigned random_seed, bool shared_parameters) {
+unsigned Initialize(int& argc, char**& argv, unsigned random_seed, bool shared_parameters) {
   vector<Device*> gpudevices;
 #if HAVE_CUDA
   cerr << "[cnn] initializing CUDA\n";
@@ -88,6 +88,8 @@ void Initialize(int& argc, char**& argv, unsigned random_seed, bool shared_param
   kSCALAR_ONE = default_device->kSCALAR_ONE;
   kSCALAR_ZERO = default_device->kSCALAR_ZERO;
   cerr << "[cnn] memory allocation done.\n";
+
+  return random_seed;
 }
 
 void Cleanup() {

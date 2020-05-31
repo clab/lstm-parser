@@ -54,7 +54,7 @@ void InitCommandLine(int argc, char** argv, po::variables_map* conf) {
   po::options_description dcmdline_options;
   dcmdline_options.add(opts);
   po::store(parse_command_line(argc, argv, dcmdline_options), *conf);
-  if (conf->count("help")) {
+  if (conf->count("help") || argc == 1) {
     cerr << dcmdline_options << endl;
     exit(0);
   }
@@ -119,8 +119,16 @@ int main(int argc, char** argv) {
     cerr << "No model specified for testing!" << endl;
     abort();
   }
+  if (train && !load_model) {
+    if (!conf.count("training_data")) {
+      cerr << "Can't train without training data! Please provide"
+              " --training_data" << endl;
+      abort();
+    }
+  }
 
-  const string words = load_model ? "" : conf["words"].as<string>();
+  const string words =
+      load_model || !conf.count("words") ? "" : conf["words"].as<string>();
   unique_ptr<LSTMParser> parser;
   if (load_model) {
     parser.reset(new LSTMParser(conf["model"].as<string>()));
@@ -135,7 +143,7 @@ int main(int argc, char** argv) {
     parser.reset(new LSTMParser(cmd_options, words, false));
   }
 
-  unique_ptr<TrainingCorpus> dev_corpus; // shared by train/evaluate
+  unique_ptr<ParserTrainingCorpus> dev_corpus; // shared by train/evaluate
 
   if (train) {
     if (!conf.count("training_data") || !conf.count("dev_data")) {
@@ -145,14 +153,16 @@ int main(int argc, char** argv) {
     }
 
     signal(SIGINT, signal_callback_handler);
-    TrainingCorpus training_corpus(&parser->vocab,
-                                   conf["training_data"].as<string>(), true);
+    ParserTrainingCorpus training_corpus(parser->GetVocab(),
+                                         conf["training_data"].as<string>(),
+                                         true);
     parser->FinalizeVocab();
     cerr << "Total number of words: " << training_corpus.vocab->CountWords()
          << endl;
     // OOV words will be replaced by UNK tokens
-    dev_corpus.reset(new TrainingCorpus(&parser->vocab,
-                                        conf["dev_data"].as<string>(), false));
+    dev_corpus.reset(
+        new ParserTrainingCorpus(parser->GetVocab(),
+                                 conf["dev_data"].as<string>(), false));
 
     ostringstream os;
     os << "parser_" << (parser->options.use_pos ? "pos" : "nopos")
@@ -180,8 +190,8 @@ int main(int argc, char** argv) {
     cerr << "Evaluating model on " << conf["dev_data"].as<string>() << endl;
     if (!train) { // Didn't already load dev corpus for training
       dev_corpus.reset(
-          new TrainingCorpus(&parser->vocab, conf["dev_data"].as<string>(),
-                             false));
+          new ParserTrainingCorpus(parser->GetVocab(),
+                                   conf["dev_data"].as<string>(), false));
     }
     parser->Evaluate(*dev_corpus);
   }
@@ -203,7 +213,8 @@ int main(int argc, char** argv) {
            << endl;
       abort();
     }
-    Corpus test_corpus(&parser->vocab, *reader, conf["test_data"].as<string>());
+    Corpus test_corpus(parser->GetVocab(), *reader,
+                       conf["test_data"].as<string>());
     parser->Test(test_corpus);
   }
 }

@@ -16,17 +16,28 @@ constexpr unsigned Corpus::ROOT_TOKEN_ID;
 const string CorpusVocabulary::BAD0 = "<BAD0>";
 const string CorpusVocabulary::UNK = "<UNK>";
 const string CorpusVocabulary::ROOT = "<ROOT>";
+// We assume that actions with arcs will be of the form
+// "action-name(arc-label)". Allow any non-paren characters, followed by the
+// label name in parens. (Group 1 is the label name.)
+const boost::regex CorpusVocabulary::ARC_ACTION_REGEX(
+    {"[^\\(\\)]+\\(([^\\(\\)]+)\\)"});
 const string ORACLE_ROOT_POS = "ROOT";
 
 
 void ConllUCorpusReader::ReadSentences(const string& file,
                                        Corpus* corpus) const {
   string next_line;
-  map<unsigned, string> current_sentence_unk_surface_forms;
-  map<unsigned, unsigned> current_sentence;
-  map<unsigned, unsigned> current_sentence_pos;
+  // TODO: Replace this code with simpler Sentence-based code.
+  Sentence::SentenceUnkMap current_sentence_unk_surface_forms;
+  Sentence::SentenceMap current_sentence;
+  Sentence::SentenceMap current_sentence_pos;
 
   ifstream conll_file(file);
+  if (!conll_file) {
+    cerr << "Unable to open corpus file " << file << "; aborting" << endl;
+    abort();
+  }
+
   unsigned unk_word_symbol = corpus->vocab->GetWord(CorpusVocabulary::UNK);
   unsigned root_symbol = corpus->vocab->GetWord(CorpusVocabulary::ROOT);
   unsigned root_pos_symbol = corpus->vocab->GetPOS(CorpusVocabulary::ROOT);
@@ -38,15 +49,11 @@ void ConllUCorpusReader::ReadSentences(const string& file,
         current_sentence_pos[Corpus::ROOT_TOKEN_ID] = root_pos_symbol;
         current_sentence_unk_surface_forms[Corpus::ROOT_TOKEN_ID] = "";
 
-        corpus->sentences.push_back(move(current_sentence));
-        current_sentence.clear();
-
-        corpus->sentences_pos.push_back(move(current_sentence_pos));
-        current_sentence_pos.clear();
-
-        corpus->sentences_unk_surface_forms.push_back(
-            move(current_sentence_unk_surface_forms));
-        current_sentence_unk_surface_forms.clear();
+        corpus->sentences.emplace_back(*corpus->vocab);
+        corpus->sentences.back().words.swap(current_sentence);
+        corpus->sentences.back().poses.swap(current_sentence_pos);
+        corpus->sentences.back().unk_surface_forms.swap(
+            current_sentence_unk_surface_forms);
       }
       continue;
     } else if (next_line[0] == '#') {
@@ -75,15 +82,16 @@ void ConllUCorpusReader::ReadSentences(const string& file,
     current_sentence[token_index] = word_id;
     current_sentence_pos[token_index] = corpus->vocab->GetPOS(pos);
   }
+
+  corpus->sentences.shrink_to_fit();
 }
 
 
-
-void TrainingCorpus::CountSingletons() {
+void ParserTrainingCorpus::CountSingletons() {
   // compute the singletons in the parser's training data
   map<unsigned, unsigned> counts;
   for (const auto& sent : sentences) {
-    for (const auto& index_and_word_id : sent) {
+    for (const auto& index_and_word_id : sent.words) {
       counts[index_and_word_id.second]++;
     }
   }
@@ -94,22 +102,130 @@ void TrainingCorpus::CountSingletons() {
 }
 
 
-void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
-    const string& file, TrainingCorpus* corpus) const {
-  // TODO: break up this function?
-  cerr << "Loading " << (is_training ? "training" : "dev")
+void TrainingCorpus::OracleTransitionsCorpusReader::RecordWord(
+    const string& word, const string& pos, unsigned next_token_index,
+    TrainingCorpus* corpus, Sentence::SentenceMap* sentence,
+    Sentence::SentenceMap* sentence_pos,
+    Sentence::SentenceUnkMap* sentence_unk_surface_forms) const {
+  // We assume that we'll have seen all POS tags in training, so don't
+  // worry about OOV tags.
+  CorpusVocabulary* vocab = corpus->vocab;
+  unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
+                                         &vocab->int_to_pos);
+
+  unsigned word_id;
+  if (is_training) {
+    unsigned num_words = vocab->CountWords(); // store for later check
+    word_id = vocab->GetOrAddWord(word, true);
+    if (vocab->CountWords() > num_words) {
+      // A new word was added; add its chars, too.
+      unsigned j = 0;
+      while (j < word.length()) {
+        unsigned char_utf8_len = UTF8Len(word[j]);
+        string next_utf8_char = word.substr(j, char_utf8_len);
+        vocab->GetOrAddEntry(next_utf8_char, &vocab->chars_to_int,
+                             &vocab->int_to_chars);
+        j += char_utf8_len;
+      }
+    } else {
+      // It's an old word. Make sure it's marked as present in training.
+      vocab->int_to_training_word[word_id] = true;
+    }
+  } else {
+    // add an empty string for any token except OOVs (it is easy to
+    // recover the surface form of non-OOV using intToWords(id)).
+    // OOV word
+    if (corpus->USE_SPELLING) {
+      word_id = vocab->GetOrAddWord(word); // don't record as training
+      (*sentence_unk_surface_forms)[next_token_index] = "";
+    } else {
+      auto word_iter = vocab->words_to_int.find(word);
+      if (word_iter == vocab->words_to_int.end()) {
+        // Save the surface form of this OOV.
+        (*sentence_unk_surface_forms)[next_token_index] = word;
+        word_id = vocab->words_to_int[vocab->UNK];
+      } else {
+        (*sentence_unk_surface_forms)[next_token_index] = "";
+        word_id = word_iter->second;
+      }
+    }
+  }
+
+  (*sentence)[next_token_index] = word_id;
+  (*sentence_pos)[next_token_index] = pos_id;
+}
+
+
+void TrainingCorpus::OracleTransitionsCorpusReader::RecordAction(
+    const string& action, TrainingCorpus* corpus,
+    vector<unsigned>* correct_actions) const {
+  CorpusVocabulary* vocab = corpus->vocab;
+  auto action_iter = find(vocab->action_names.begin(), vocab->action_names.end(), action);
+  if (action_iter != vocab->action_names.end()) {
+    unsigned action_index = distance(vocab->action_names.begin(), action_iter);
+    correct_actions->push_back(action_index);
+  } else { // A not-previously-seen action
+    if (is_training) {
+      vocab->action_names.push_back(action);
+      unsigned action_index = vocab->action_names.size() - 1;
+      correct_actions->push_back(action_index);
+      vocab->actions_to_arc_labels.push_back(vocab->GetLabelForAction(action));
+    } else {
+      // TODO: right now, new actions which haven't been observed in
+      // training are not added to correct_act_sent. In dev, this may
+      // be a problem if there is little training data.
+      cerr << "WARNING: encountered unknown transition in dev corpus: "
+           << action << endl;
+    }
+  }
+}
+
+
+void TrainingCorpus::OracleTransitionsCorpusReader::RecordSentence(
+    TrainingCorpus* corpus, Sentence::SentenceMap* words,
+    Sentence::SentenceMap* sentence_pos,
+    Sentence::SentenceUnkMap* sentence_unk_surface_forms,
+    vector<unsigned>* correct_actions,
+    Sentence::SentenceMetadata* metadata) const {
+  // Store the sentence variables and clear them for the next sentence.
+  corpus->sentences.emplace_back(*corpus->vocab);
+  Sentence* sentence = &corpus->sentences.back();
+  sentence->words.swap(*words);
+  sentence->poses.swap(*sentence_pos);
+  sentence->metadata.reset(metadata);
+  corpus->correct_act_sent.push_back({});
+  corpus->correct_act_sent.back().swap(*correct_actions);
+
+  if (!is_training) {
+    sentence->unk_surface_forms.swap(*sentence_unk_surface_forms);
+  }
+
+  assert(corpus->correct_act_sent.size() == corpus->sentences.size());
+}
+
+
+void ParserTrainingCorpus::OracleParseTransitionsReader::LoadCorrectActions(
+    const string& file, ParserTrainingCorpus* corpus) const {
+  cerr << "Loading " << (is_training ? "training" : "dev/test")
        << " corpus from " << file << "..." << endl;
-  ifstream actionsFile(file);
-  string lineS;
+  ifstream actions_file(file);
+  if (!actions_file) {
+    cerr << "Unable to open actions file " << file << "; aborting" << endl;
+    abort();
+  }
+
+  string line;
   CorpusVocabulary* vocab = corpus->vocab;
 
   bool next_is_action_line = false;
   bool start_of_sentence = false;
   bool first = true;
 
-  map<unsigned, unsigned> sentence;
-  map<unsigned, unsigned> sentence_pos;
-  map<unsigned, string> sentence_unk_surface_forms;
+  // TODO: replace this code with simpler Sentence-based code.
+  Sentence::SentenceMap sentence;
+  Sentence::SentenceMap sentence_pos;
+  Sentence::SentenceUnkMap sentence_unk_surface_forms;
+  vector<unsigned> correct_actions;
 
   // We'll need to make sure ROOT token has a consistent ID.
   // (Should get inlined; defined here for DRY purposes.)
@@ -133,24 +249,16 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
     }
   };
 
-  while (getline(actionsFile, lineS)) {
-    ReplaceStringInPlace(lineS, "-RRB-", "_RRB_");
-    ReplaceStringInPlace(lineS, "-LRB-", "_LRB_");
+  while (getline(actions_file, line)) {
+    ReplaceStringInPlace(&line, "-RRB-", "_RRB_");
+    ReplaceStringInPlace(&line, "-LRB-", "_LRB_");
     // An empty line marks the end of a sentence.
-    if (lineS.empty()) {
+    if (line.empty()) {
       next_is_action_line = false;
       if (!first) { // if first, first line is blank, but no sentence yet
         FixRootID();
-        // Store the sentence variables and clear them for the next sentence.
-        corpus->sentences.push_back({});
-        corpus->sentences.back().swap(sentence);
-        corpus->sentences_pos.push_back({});
-        corpus->sentences_pos.back().swap(sentence_pos);
-        if (!is_training) {
-          corpus->sentences_unk_surface_forms.push_back({});
-          corpus->sentences_unk_surface_forms.back().swap(
-              sentence_unk_surface_forms);
-        }
+        RecordSentence(corpus, &sentence, &sentence_pos,
+                       &sentence_unk_surface_forms, &correct_actions);
       }
       start_of_sentence = true;
       continue; // don't update next_is_action_line
@@ -163,9 +271,9 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
         // the initial line in each sentence should look like:
         // [][the-det, cat-noun, is-verb, on-adp, the-det, mat-noun, ,-punct, ROOT-ROOT]
         // first, get rid of the square brackets.
-        lineS = lineS.substr(3, lineS.size() - 4);
+        line = line.substr(3, line.size() - 4);
         // read the initial line, token by token "the-det," "cat-noun," ...
-        istringstream iss(lineS);
+        istringstream iss(line);
         do {
           string word;
           iss >> word;
@@ -177,14 +285,14 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
             word = word.substr(0, word.size() - 1);
           }
           // split the string (at '-') into word and POS tag.
-          size_t posIndex = word.rfind('-');
-          if (posIndex == string::npos) {
+          size_t pos_index = word.rfind('-');
+          if (pos_index == string::npos) {
             cerr << "can't find the dash in '" << word << "'"
                  << endl;
           }
-          assert(posIndex != string::npos);
-          string pos = word.substr(posIndex + 1);
-          word = word.substr(0, posIndex);
+          assert(pos_index != string::npos);
+          string pos = word.substr(pos_index + 1);
+          word = word.substr(0, pos_index);
 
           if (pos == ORACLE_ROOT_POS) {
             // Prevent any confusion with the actual word "ROOT".
@@ -192,84 +300,14 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
             pos = CorpusVocabulary::ROOT;
           }
 
-          // We assume that we'll have seen all POS tags in training, so don't
-          // worry about OOV tags.
-          unsigned pos_id = vocab->GetOrAddEntry(pos, &vocab->pos_to_int,
-                                                 &vocab->int_to_pos);
           // Use 1-indexed token IDs to leave room for ROOT in position 0.
           unsigned next_token_index = sentence.size() + 1;
-          unsigned word_id;
-          if (is_training) {
-            unsigned num_words = vocab->CountWords(); // store for later check
-            word_id = vocab->GetOrAddWord(word, true);
-            if (vocab->CountWords() > num_words) {
-              // A new word was added; add its chars, too.
-              unsigned j = 0;
-              while (j < word.length()) {
-                unsigned char_utf8_len = UTF8Len(word[j]);
-                string next_utf8_char = word.substr(j, char_utf8_len);
-                vocab->GetOrAddEntry(next_utf8_char, &vocab->chars_to_int,
-                                     &vocab->int_to_chars);
-                j += char_utf8_len;
-              }
-            } else {
-              // It's an old word. Make sure it's marked as present in training.
-              vocab->int_to_training_word[word_id] = true;
-            }
-          } else {
-            // add an empty string for any token except OOVs (it is easy to
-            // recover the surface form of non-OOV using intToWords(id)).
-            // OOV word
-            if (corpus->USE_SPELLING) {
-              word_id = vocab->GetOrAddWord(word); // don't record as training
-              sentence_unk_surface_forms[next_token_index] = "";
-            } else {
-              auto word_iter = vocab->words_to_int.find(word);
-              if (word_iter == vocab->words_to_int.end()) {
-                // Save the surface form of this OOV.
-                sentence_unk_surface_forms[next_token_index] = word;
-                word_id = vocab->words_to_int[vocab->UNK];
-              } else {
-                sentence_unk_surface_forms[next_token_index] = "";
-                word_id = word_iter->second;
-              }
-            }
-          }
-
-          sentence[next_token_index] = word_id;
-          sentence_pos[next_token_index] = pos_id;
+          RecordWord(word, pos, next_token_index, corpus, &sentence,
+                     &sentence_pos, &sentence_unk_surface_forms);
         } while (iss);
       }
-    } else if (next_is_action_line) {
-      auto action_iter = find(vocab->actions.begin(), vocab->actions.end(),
-                              lineS);
-      if (action_iter != vocab->actions.end()) {
-        unsigned action_index = distance(vocab->actions.begin(), action_iter);
-        if (start_of_sentence)
-          corpus->correct_act_sent.push_back({action_index});
-        else
-          corpus->correct_act_sent.back().push_back(action_index);
-      } else { // A not-previously-seen action
-        if (is_training) {
-          vocab->actions.push_back(lineS);
-          vocab->actions_to_arc_labels.push_back(
-              vocab->GetLabelForAction(lineS));
-
-          unsigned action_index = vocab->actions.size() - 1;
-          if (start_of_sentence)
-            corpus->correct_act_sent.push_back({action_index});
-          else
-            corpus->correct_act_sent.back().push_back(action_index);
-        } else {
-          // TODO: right now, new actions which haven't been observed in
-          // training are not added to correct_act_sent. In dev, this may
-          // be a problem if there is little training data.
-          cerr << "WARNING: encountered unknown transition in dev corpus: "
-               << lineS << endl;
-          if (start_of_sentence)
-            corpus->correct_act_sent.push_back({});
-        }
-      }
+    } else { // next_is_action_line
+      RecordAction(line, corpus, &correct_actions);
       start_of_sentence = false;
     }
 
@@ -279,19 +317,16 @@ void TrainingCorpus::OracleTransitionsCorpusReader::LoadCorrectActions(
   // Add the last sentence.
   if (sentence.size() > 0) {
     FixRootID();
-    corpus->sentences.push_back(move(sentence));
-    corpus->sentences_pos.push_back(move(sentence_pos));
-    if (!is_training) {
-      corpus->sentences_unk_surface_forms.push_back(
-          move(sentence_unk_surface_forms));
-    }
+    RecordSentence(corpus, &sentence, &sentence_pos,
+                   &sentence_unk_surface_forms, &correct_actions);
   }
 
-  actionsFile.close();
+  actions_file.close();
 
   cerr << "done." << "\n";
   if (is_training) {
-    for (auto a : vocab->actions) {
+    for (auto a : vocab->action_names) {
+      vocab->actions_to_arc_labels.push_back(vocab->GetLabelForAction(a));
       cerr << a << "\n";
     }
   }

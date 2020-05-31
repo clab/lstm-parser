@@ -8,6 +8,8 @@ namespace cnn {
 
 class AlignedMemoryPool {
  public:
+  typedef size_t PoolState;
+
   explicit AlignedMemoryPool(size_t cap, MemAllocator* a) : a(a) {
     sys_alloc(cap);
     zero_all();
@@ -35,6 +37,14 @@ class AlignedMemoryPool {
 
   bool is_shared() {
     return shared;
+  }
+
+  PoolState get_state() const {
+    return used;
+  }
+
+  void restore_state(const PoolState& state) {
+    used = state;
   }
  private:
   void sys_alloc(size_t cap) {

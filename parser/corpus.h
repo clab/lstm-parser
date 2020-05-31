@@ -2,6 +2,7 @@
 #define CORPUS_H
 
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/regex.hpp>
 #include <boost/serialization/split_member.hpp>
 #include <exception>
 #include <stddef.h>
@@ -34,24 +35,26 @@ public:
   StrToIntMap chars_to_int;
   std::vector<std::string> int_to_chars;
 
-  std::vector<std::string> actions;
+  std::vector<std::string> action_names;
   std::vector<std::string> actions_to_arc_labels;
+
+  unsigned kUNK;
 
   CorpusVocabulary() : int_to_training_word({true, true}) {
     AddEntry(BAD0, &words_to_int, &int_to_words);
-    AddEntry(UNK, &words_to_int, &int_to_words);
+    kUNK = AddEntry(UNK, &words_to_int, &int_to_words);
     AddEntry(BAD0, &chars_to_int, &int_to_chars);
   }
 
   inline unsigned CountPOS() { return pos_to_int.size(); }
   inline unsigned CountWords() { return words_to_int.size(); }
   inline unsigned CountChars() { return chars_to_int.size(); }
-  inline unsigned CountActions() { return actions.size(); }
+  inline unsigned CountActions() { return action_names.size(); }
 
   inline unsigned GetWord(const std::string& word) const {
     auto word_iter = words_to_int.find(word);
     if (word_iter == words_to_int.end()) {
-      return words_to_int.find(CorpusVocabulary::UNK)->second;
+      return kUNK;
     } else {
       return word_iter->second;
     }
@@ -92,12 +95,9 @@ public:
   }
 
   static inline std::string GetLabelForAction(const std::string& action) {
-    if (boost::starts_with(action, "RIGHT-ARC") ||
-        boost::starts_with(action, "LEFT-ARC")) {
-      size_t first_char_in_rel = action.find('(') + 1;
-      size_t last_char_in_rel = action.rfind(')') - 1;
-      return action.substr(
-          first_char_in_rel, last_char_in_rel - first_char_in_rel + 1);
+    boost::smatch match;
+    if (boost::regex_search(action, match, ARC_ACTION_REGEX)) {
+      return match[1];
     } else {
       return "NONE";
     }
@@ -105,6 +105,8 @@ public:
 
 private:
   friend class boost::serialization::access;
+
+  static const boost::regex ARC_ACTION_REGEX;
 
   template<class Archive, class VocabType>
   // Shared code: serialize the number-to-string mappings, from which the
@@ -115,7 +117,7 @@ private:
     ar & vocab->int_to_pos;
     ar & vocab->int_to_chars;
     ar & vocab->int_to_training_word;
-    ar & vocab->actions;
+    ar & vocab->action_names;
   }
 
   template<class Archive>
@@ -149,7 +151,7 @@ private:
       chars_to_int[int_to_chars[i]] = i;
 
     // ...and the arc labels.
-    for (const std::string& action : actions) {
+    for (const std::string& action : action_names) {
       actions_to_arc_labels.push_back(GetLabelForAction(action));
     }
   }
@@ -186,15 +188,69 @@ public:
 };
 
 
+class Sentence;
+inline std::ostream& operator<<(std::ostream& os, const Sentence& sent);
+
+class ParseTree;  // forward declaration
+
+class Sentence {
+public:
+  typedef std::map<unsigned, unsigned> SentenceMap;
+  typedef std::map<unsigned, std::string> SentenceUnkMap;
+
+  // TODO: move correct_act_sent from corpus-level to here
+  struct SentenceMetadata {};
+
+  Sentence(const CorpusVocabulary& vocab) : vocab(&vocab), tree(nullptr) {}
+
+  SentenceMap words;
+  SentenceMap poses;
+  SentenceUnkMap unk_surface_forms;
+  const CorpusVocabulary* vocab;
+  ParseTree* tree;
+  std::unique_ptr<SentenceMetadata> metadata;
+
+  size_t Size() const {
+    return words.size();
+  }
+
+  const std::string& WordForToken(unsigned token_id) const {
+    return WordForToken(words.find(token_id), token_id);
+  }
+
+  const std::string& WordForToken(SentenceMap::const_iterator words_iter,
+                                  unsigned token_id) const {
+    unsigned word_id = words_iter->second;
+    return word_id == vocab->kUNK ? unk_surface_forms.at(token_id)
+                                  : vocab->int_to_words[word_id];
+  }
+};
+
+inline std::ostream& operator<<(std::ostream& os, const Sentence& sent) {
+  for (auto &index_and_word_id : sent.words) {
+    unsigned index = index_and_word_id.first;
+    unsigned word_id = index_and_word_id.second;
+    unsigned pos_id = sent.poses.at(index);
+    auto unk_iter = sent.unk_surface_forms.find(index);
+    os << (unk_iter == sent.unk_surface_forms.end() || unk_iter->second == ""
+            ? sent.vocab->int_to_words.at(word_id)
+            : unk_iter->second)
+       << '/' << sent.vocab->int_to_pos.at(pos_id);
+    if (index != sent.words.rend()->first) {
+      os << ' ';
+    }
+  }
+  return os;
+}
+
+
 class Corpus {
 public:
   // Store root tokens with unsigned ID -1 internally to make root come last
   // when iterating over a list of tokens in order of IDs.
   static constexpr unsigned ROOT_TOKEN_ID = -1;
 
-  std::vector<std::map<unsigned, unsigned>> sentences;
-  std::vector<std::map<unsigned, unsigned>> sentences_pos;
-  std::vector<std::map<unsigned, std::string>> sentences_unk_surface_forms;
+  std::vector<Sentence> sentences;
   CorpusVocabulary* vocab;
 
   Corpus(CorpusVocabulary* vocab, const CorpusReader& reader,
@@ -207,38 +263,49 @@ protected:
   // Corpus for subclasses to inherit and use. Subclasses are then responsible
   // for doing any corpus-reading or setup.
   Corpus(CorpusVocabulary* vocab) : vocab(vocab) {}
-
 };
 
 
 class TrainingCorpus : public Corpus {
 public:
-  friend class OracleTransitionsCorpusReader;
-
+  std::vector<std::vector<unsigned>> correct_act_sent;
   bool USE_SPELLING = false;
 
-  std::vector<std::vector<unsigned>> correct_act_sent;
-  std::set<unsigned> singletons;
-
-  TrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
-                 bool is_training) :
-      Corpus(vocab) {
-    OracleTransitionsCorpusReader reader(is_training);
-    reader.ReadSentences(file, this);
-  }
-
-private:
+protected:
   class OracleTransitionsCorpusReader : public CorpusReader {
   public:
     OracleTransitionsCorpusReader(bool is_training) :
-        is_training(is_training) {}
-
-    virtual void ReadSentences(const std::string& file, Corpus* corpus) const {
-      TrainingCorpus* training_corpus = static_cast<TrainingCorpus *>(corpus);
-      LoadCorrectActions(file, training_corpus);
+        is_training(is_training) {
     }
 
-    virtual ~OracleTransitionsCorpusReader() {};
+    static inline void ReplaceStringInPlace(std::string* subject,
+                                            const std::string& search,
+                                            const std::string& replace) {
+      size_t pos = 0;
+      while ((pos = subject->find(search, pos)) != std::string::npos) {
+        subject->replace(pos, search.length(), replace);
+        pos += replace.length();
+      }
+    }
+
+  protected:
+    bool is_training; // can be dev rather than actual training
+
+    void RecordWord(
+        const std::string& word, const std::string& pos,
+        unsigned next_token_index, TrainingCorpus* corpus,
+        Sentence::SentenceMap* sentence,
+        Sentence::SentenceMap* sentence_pos,
+        Sentence::SentenceUnkMap* sentence_unk_surface_forms) const;
+
+    void RecordAction(const std::string& action, TrainingCorpus* corpus,
+                      std::vector<unsigned>* correct_actions) const;
+
+    void RecordSentence(TrainingCorpus* corpus, Sentence::SentenceMap* words,
+                        Sentence::SentenceMap* sentence_pos,
+                        Sentence::SentenceUnkMap* sentence_unk_surface_forms,
+                        std::vector<unsigned>* correct_actions,
+                        Sentence::SentenceMetadata* metadata = nullptr) const;
 
     static inline unsigned UTF8Len(unsigned char x) {
       if (x < 0x80) return 1;
@@ -249,25 +316,57 @@ private:
       else if ((x >> 1) == 0x7e) return 6;
       else return 0;
     }
-  private:
-    bool is_training;
-    void LoadCorrectActions(const std::string& file,
-                            TrainingCorpus* corpus) const;
   };
 
-  static inline void ReplaceStringInPlace(std::string& subject,
-                                          const std::string& search,
-                                          const std::string& replace) {
-    size_t pos = 0;
-    while ((pos = subject.find(search, pos)) != std::string::npos) {
-      subject.replace(pos, search.length(), replace);
-      pos += replace.length();
-    }
+  // Don't provide access to reader constructor -- object won't be fully
+  // constructed yet, so it would segfault.
+  TrainingCorpus(CorpusVocabulary* vocab) : Corpus(vocab) {}
+};
+
+
+class ParserTrainingCorpus : public TrainingCorpus {
+public:
+  friend class OracleTransitionsCorpusReader;
+
+  std::set<unsigned> singletons;
+
+  ParserTrainingCorpus(CorpusVocabulary* vocab, const std::string& file,
+                       bool is_training) :
+      TrainingCorpus(vocab) {
+    OracleParseTransitionsReader(is_training).ReadSentences(file, this);
   }
+
+private:
+  class OracleParseTransitionsReader : public OracleTransitionsCorpusReader{
+  public:
+    OracleParseTransitionsReader(bool is_training) :
+        OracleTransitionsCorpusReader(is_training) {}
+
+    virtual void ReadSentences(const std::string& file, Corpus* corpus) const {
+      ParserTrainingCorpus* training_corpus =
+          static_cast<ParserTrainingCorpus*>(corpus);
+      LoadCorrectActions(file, training_corpus);
+      training_corpus->sentences.shrink_to_fit();
+      training_corpus->correct_act_sent.shrink_to_fit();
+    }
+
+    virtual ~OracleParseTransitionsReader() {};
+
+  private:
+    void LoadCorrectActions(const std::string& file,
+                            ParserTrainingCorpus* corpus) const;
+  };
 
   void CountSingletons();
 };
 
 } // namespace lstm_parser
+
+
+inline void swap(lstm_parser::Sentence& s1, lstm_parser::Sentence& s2) {
+  lstm_parser::Sentence tmp = std::move(s1);
+  s1 = std::move(s2);
+  s2 = std::move(tmp);
+}
 
 #endif

@@ -20,6 +20,7 @@
 #include "cnn/rnn.h"
 #include "corpus.h"
 #include "eos/portable_archive.hpp"
+#include "neural-transition-tagger.h"
 
 
 namespace lstm_parser {
@@ -66,26 +67,44 @@ struct ParserOptions {
 };
 
 
+// Barebones representation of a parse tree.
 class ParseTree {
 public:
-  static std::string NO_LABEL;
-  // Barebones representation of a parse tree.
-  const std::map<unsigned, unsigned>& sentence;
+  static const std::string NO_LABEL;
 
-  ParseTree(const std::map<unsigned, unsigned>& sentence, bool labeled = true) :
-      sentence(sentence),
-      arc_labels( labeled ? new std::map<unsigned, std::string> : nullptr) {
-  }
+  double logprob;
 
-  inline void SetParent(unsigned child_index, unsigned parent_index,
+  ParseTree(const Sentence& sentence, bool labeled = true) :
+      logprob(0),
+      arc_labels(labeled ? new std::map<unsigned, std::string> : nullptr),
+      sentence(sentence), root_child(-1) {}
+
+  ParseTree(const ParseTree& other)
+      : logprob(other.logprob), parents(other.parents),
+        arc_labels(other.IsLabeled() ?
+            new std::map<unsigned, std::string>(*other.arc_labels) : nullptr),
+        sentence(other.sentence), root_child(-1) {}
+
+  ParseTree(ParseTree&& other) = default;
+
+  ParseTree& operator=(ParseTree&& other) = default;
+
+  void SetParent(unsigned child_index, unsigned parent_index,
                       const std::string& arc_label="") {
     parents[child_index] = parent_index;
-    if (arc_labels) {
+    if (IsLabeled()) {
       (*arc_labels)[child_index] = arc_label;
+    }
+    if (parent_index == Corpus::ROOT_TOKEN_ID) {
+      root_child = child_index;
     }
   }
 
-  const inline unsigned GetParent(unsigned child) const {
+  const Sentence& GetSentence() const {
+    return sentence.get();
+  }
+
+  const unsigned GetParent(unsigned child) const {
     auto parent_iter = parents.find(child);
     if (parent_iter == parents.end()) {
       return Corpus::ROOT_TOKEN_ID; // This is the best guess we've got.
@@ -94,8 +113,8 @@ public:
     }
   }
 
-  const inline std::string& GetArcLabel(unsigned child) const {
-    if (!arc_labels)
+  const std::string& GetArcLabel(unsigned child) const {
+    if (!IsLabeled())
       return NO_LABEL;
     auto arc_label_iter = arc_labels->find(child);
     if (arc_label_iter == arc_labels->end()) {
@@ -105,23 +124,24 @@ public:
     }
   }
 
-private:
+  const unsigned GetRootChild() const { return root_child; }
+
+  bool IsLabeled() const { return arc_labels.get(); }
+
+protected:
   std::map<unsigned, unsigned> parents;
   std::unique_ptr<std::map<unsigned, std::string>> arc_labels;
+  std::reference_wrapper<const Sentence> sentence;
+  unsigned root_child;
 };
 
 
-class LSTMParser {
+class LSTMParser : public NeuralTransitionTagger {
 public:
-  // TODO: make some of these members non-public
   ParserOptions options;
-  CorpusVocabulary vocab;
-  cnn::Model model;
 
-  bool finalized;
   std::unordered_map<unsigned, std::vector<float>> pretrained;
   unsigned n_possible_actions;
-  const unsigned kUNK;
   const unsigned kROOT_SYMBOL;
 
   cnn::LSTMBuilder stack_lstm; // (layers, input, hidden, trainer)
@@ -155,94 +175,121 @@ public:
                          bool finalize=true);
 
   explicit LSTMParser(const std::string& model_path) :
-      kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
-    std::cerr << "Loading model from " << model_path << "...";
+    std::cerr << "Loading parser model from " << model_path << "...";
     auto t_start = std::chrono::high_resolution_clock::now();
     std::ifstream model_file(model_path.c_str(), std::ios::binary);
+    if (!model_file) {
+      std::cerr << "Unable to open model file; aborting" << std::endl;
+      abort();
+    }
     eos::portable_iarchive archive(model_file);
     archive >> *this;
     auto t_end = std::chrono::high_resolution_clock::now();
     auto ms_passed =
         std::chrono::duration<double, std::milli>(t_end - t_start).count();
-    std::cerr << "done. (Loading took " << ms_passed << " milliseconds.)" << std::endl;
+    std::cerr << "done. (Loading took " << ms_passed << " milliseconds.)"
+              << std::endl;
   }
 
 
   template <class Archive>
   explicit LSTMParser(Archive* archive) :
-      kUNK(vocab.GetOrAddWord(vocab.UNK)),
       kROOT_SYMBOL(vocab.GetOrAddWord(vocab.ROOT)) {
     *archive >> *this;
   }
 
-  static bool IsActionForbidden(const std::string& a, unsigned bsize,
-                                unsigned ssize, const std::vector<int>& stacki);
-
-  ParseTree Parse(const std::map<unsigned, unsigned>& sentence,
-                  const std::map<unsigned, unsigned>& sentence_pos,
-                  const CorpusVocabulary& vocab, bool labeled, double* correct);
+  ParseTree Parse(const Sentence& sentence,
+                  const CorpusVocabulary& vocab, bool labeled);
 
   // take a vector of actions and return a parse tree
   ParseTree RecoverParseTree(
-      const std::map<unsigned, unsigned>& sentence,
-      const std::vector<unsigned>& actions,
-      const std::vector<std::string>& action_names,
-      const std::vector<std::string>& actions_to_arc_labels,
-      bool labeled = false);
+      const Sentence& sentence, const std::vector<unsigned>& actions,
+      double logprob = 0, bool labeled = false) const;
 
-  void Train(const TrainingCorpus& corpus, const TrainingCorpus& dev_corpus,
-             const double unk_prob, const std::string& model_fname,
+  void Train(const ParserTrainingCorpus& corpus,
+             const ParserTrainingCorpus& dev_corpus, const double unk_prob,
+             const std::string& model_fname,
              const volatile bool* requested_stop = nullptr);
 
   void Test(const Corpus& corpus) {
     DoTest(corpus, false, true);
   }
 
-  void Evaluate(const TrainingCorpus& corpus, bool output_parses=false) {
+  void Evaluate(const ParserTrainingCorpus& corpus, bool output_parses=false) {
     DoTest(corpus, true, output_parses);
   }
 
-  // Used for testing. Replaces OOV with UNK.
-  std::vector<unsigned> LogProbParser(
-      const std::map<unsigned, unsigned>& sentence,
-      const std::map<unsigned, unsigned>& sentence_pos,
-      const CorpusVocabulary& vocab, cnn::ComputationGraph *cg,
-      double* correct);
-
   void LoadPretrainedWords(const std::string& words_path);
 
-  void FinalizeVocab();
-
 protected:
-  // *** if correct_actions is empty, this runs greedy decoding ***
-  // returns parse actions for input sentence (in training just returns the
-  // reference)
-  // OOV handling: raw_sent will have the actual words
-  //               sent will have words replaced by appropriate UNK tokens
-  // this lets us use pretrained embeddings, when available, for words that were
-  // OOV in the parser training data.
-  std::vector<unsigned> LogProbParser(
-      cnn::ComputationGraph* hg,
-      const std::map<unsigned, unsigned>& raw_sent,  // raw sentence
-      const std::map<unsigned, unsigned>& sent,  // sentence with OOVs replaced
-      const std::map<unsigned, unsigned>& sentPos,
-      const std::vector<unsigned>& correct_actions,
-      const std::vector<std::string>& action_names,
-      const std::vector<std::string>& int_to_words, double* right);
+  struct ParserState : public TaggerState {
+    std::vector<cnn::expr::Expression> buffer;
+    std::vector<int> bufferi; // position of the words in the sentence
+    std::vector<cnn::expr::Expression> stack;  // subtree embeddings
+    std::vector<int> stacki; // word position in sentence of head of subtree
 
-  void SaveModel(const std::string& model_fname, bool softlink_created);
+    ParserState(const Sentence& raw_sentence,
+                const Sentence::SentenceMap& sentence, Expression stack_guard)
+        : TaggerState(raw_sentence, sentence), buffer(raw_sentence.Size() + 1),
+          bufferi(raw_sentence.Size() + 1), stack({stack_guard}),
+          stacki({-999}) {}
+
+    ~ParserState() {
+      assert(stack.size() == 2); // guard symbol, root
+      assert(stacki.size() == 2);
+      assert(buffer.size() == 1); // guard symbol
+      assert(bufferi.size() == 1);
+    }
+  };
+
+  virtual std::vector<cnn::Parameters*> GetParameters() override {
+    std::vector<cnn::Parameters*> all_params {p_pbias, p_H, p_D, p_R, p_cbias,
+        p_S, p_B, p_A, p_ib, p_w2l, p_p2a, p_abias, p_action_start,
+        p_stack_guard};
+    if (options.use_pos)
+      all_params.push_back(p_p2l);
+    if (p_t2l)
+      all_params.push_back(p_t2l);
+    return all_params;
+  }
+
+  virtual TaggerState* InitializeParserState(
+      cnn::ComputationGraph* cg, const Sentence& raw_sent,
+      const Sentence::SentenceMap& sent,  // sentence with OOVs replaced
+      const std::vector<unsigned>& correct_actions) override;
+
+  virtual void InitializeNetworkParameters() override;
+
+  virtual bool ShouldTerminate(TaggerState* state) const override {
+    const ParserState& real_state = static_cast<const ParserState&>(*state);
+    return real_state.stack.size() <= 2 && real_state.buffer.size() <= 1;
+  }
+
+  virtual bool IsActionForbidden(const unsigned action,
+                                 TaggerState* state) const override;
+
+  virtual cnn::expr::Expression GetActionProbabilities(TaggerState* state)
+      override;
+
+  virtual void DoAction(
+      unsigned action, TaggerState* state, cnn::ComputationGraph* cg,
+      std::map<std::string, cnn::expr::Expression>* states_to_expose) override;
 
   inline unsigned ComputeCorrect(const ParseTree& ref,
                                  const ParseTree& hyp) const {
-    assert(ref.sentence.size() == hyp.sentence.size());
+    assert(ref.GetSentence().Size() == hyp.GetSentence().Size());
     unsigned correct_count = 0;
-    for (const auto& token_index_and_word : ref.sentence) {
+    for (const auto& token_index_and_word : ref.GetSentence().words) {
       unsigned i = token_index_and_word.first;
       if (i != Corpus::ROOT_TOKEN_ID && ref.GetParent(i) == hyp.GetParent(i))
         ++correct_count;
     }
     return correct_count;
+  }
+
+  virtual void DoSave(eos::portable_oarchive& archive) override {
+    archive << *this;
   }
 
 private:
@@ -253,7 +300,7 @@ private:
     ar & options;
     ar & vocab;
     ar & pretrained;
-    ar & model;
+    ar & *model;
   }
 
   template<class Archive>
@@ -266,27 +313,25 @@ private:
     ar & pretrained;
     // Don't finalize yet...we want to finalize once our model is initialized.
 
-    model = cnn::Model();
+    model.reset(new cnn::Model);
     // Reset the LSTMs *before* reading in the network model, to make sure the
     // model knows how big it's supposed to be.
     stack_lstm = cnn::LSTMBuilder(options.layers, options.lstm_input_dim,
-                                  options.hidden_dim, &model);
+                                  options.hidden_dim, model.get());
     buffer_lstm = cnn::LSTMBuilder(options.layers, options.lstm_input_dim,
-                                   options.hidden_dim, &model);
+                                   options.hidden_dim, model.get());
     action_lstm = cnn::LSTMBuilder(options.layers, options.action_dim,
-                                   options.hidden_dim, &model);
+                                   options.hidden_dim, model.get());
 
-    FinalizeVocab(); // OK, now finalize. :)
+    FinalizeVocab(); // OK, now finalize. :) (Also initializes network params.)
 
-    ar & model;
+    ar & *model;
   }
   BOOST_SERIALIZATION_SPLIT_MEMBER();
 
   void DoTest(const Corpus& corpus, bool evaluate, bool output_parses);
 
-  static void OutputConll(const std::map<unsigned, unsigned>& sentence,
-      const std::map<unsigned, unsigned>& pos,
-      const std::map<unsigned, std::string>& sentence_unk_strings,
+  static void OutputConll(const Sentence& sentence,
       const std::vector<std::string>& int_to_words,
       const std::vector<std::string>& int_to_pos,
       const std::map<std::string, unsigned>& words_to_int,

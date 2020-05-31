@@ -7,6 +7,7 @@
 #include "cnn/dim.h"
 #include "cnn/random.h"
 #include "cnn/aligned-mem-pool.h"
+#include "devices.h"
 
 #if HAVE_CUDA
 #include <cuda.h>
@@ -26,6 +27,7 @@ namespace cnn {
 #define EIGEN_BACKEND 1
 
 typedef float real;
+extern Device* default_device; // for allocating memory on a load
 
 struct Tensor {
   Tensor() = default;
@@ -160,8 +162,12 @@ struct Tensor {
     float* vc = static_cast<float*>(std::malloc(d.size() * sizeof(float)));
     ar & boost::serialization::make_array(vc, d.size());
     CUDA_CHECK(cudaMemcpyAsync(v, vc, d.size() * sizeof(float), cudaMemcpyHostToDevice));
+    free(vc);
 #else
-    v = static_cast<float*>(_mm_malloc(d.size() * sizeof(float), 32));
+    // UGLY HACK to avoid memory leak: node values and gradients don't get
+    // stored to disk; only parameters. So allocate memory for loading from the
+    // parameters pool.
+    v = static_cast<float*>(default_device->ps->allocate(d.size() * sizeof(float)));
     ar & boost::serialization::make_array(v, d.size());
 #endif
   }

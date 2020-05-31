@@ -25,7 +25,7 @@ Given a `training.conll` file and a `development.conll` formatted according to t
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c training.conll > trainingOracle.txt
     java -jar ParserOracleArcStdWithSwap.jar -t -1 -l 1 -c development.conll > devOracle.txt
 
-    parser/lstm-parse -P -t trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 -w sskip.100.vectors --rel_dim 20 --action_dim 20
+    parser/lstm-parse --train -t trainingOracle.txt -d devOracle.txt --hidden_dim 100 --lstm_input_dim 100 --words sskip.100.vectors --rel_dim 20 --action_dim 20 --use_pos_tags
 
 Link to the word vectors used in the ACL 2015 paper for English:  [sskip.100.vectors](https://drive.google.com/file/d/0B8nESzOdPhLsdWF2S1Ayb1RkTXc/view?usp=sharing).
 
@@ -43,7 +43,7 @@ There is a pretrained model for English [here](http://www.cs.cmu.edu/~jdunietz/h
 
 Given a `test.conll` file formatted according to the [CoNLL data format](http://ilk.uvt.nl/conll/#dataformat):
 
-    parser/lstm-parse -m english_pos_2_32_100_20_100_12_20.params -t test.conll
+    parser/lstm-parse -m english_pos_2_32_100_20_100_12_20.params -T test.conll -s
 
 If you are not using the pretrained model, you will need to replace the `.params` argument with the name of your own trained model file.
 
